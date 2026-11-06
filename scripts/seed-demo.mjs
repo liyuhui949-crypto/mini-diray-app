@@ -17,7 +17,31 @@ import { writeArchiveZip, writePhotoPng, writeRainWav } from './lib/media.mjs'
 
 const BIG = process.argv.includes('--big')
 const PACKAGE_PATH = path.resolve('demo/40-days.minidiary')
+const KEY_PATH = path.resolve('demo/40-days.key.txt')
 const VAULT_PASSWORD = 'seed-vault-2026'
+
+// 与 src/shared/packageKey.ts 保持一致的字母表（脚本是 .mjs，不能直接 import TS）
+const KEY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ'
+const KEY_LENGTH = 32
+
+function generatePackageKey() {
+  const limit = Math.floor(256 / KEY_ALPHABET.length) * KEY_ALPHABET.length
+  let key = ''
+  while (key.length < KEY_LENGTH) {
+    const bytes = new Uint8Array(KEY_LENGTH)
+    globalThis.crypto.getRandomValues(bytes)
+    for (const byte of bytes) {
+      if (byte >= limit) continue
+      key += KEY_ALPHABET[byte % KEY_ALPHABET.length]
+      if (key.length === KEY_LENGTH) break
+    }
+  }
+  return key
+}
+
+function formatPackageKey(key) {
+  return key.match(/.{1,4}/g).join('-')
+}
 
 // 附件名会直接取源文件名（主进程只接受路径），所以临时文件就用中文名
 const MEDIA = {
@@ -225,19 +249,35 @@ async function main() {
     await app.evaluate(({ dialog }, target) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: target })
     }, PACKAGE_PATH)
+    const packageKey = generatePackageKey()
     const exported = await page.evaluate(
-      async (password) => window.miniDiary.invoke('migration:export', { packagePassword: password }),
-      demoPassword
+      async ({ password, key }) =>
+        window.miniDiary.invoke('migration:export', { packagePassword: password, packageKey: key }),
+      { password: demoPassword, key: packageKey }
     )
     if (!exported.ok) throw new Error(`导出失败：${exported.error.message}`)
     if (!exported.data.path) throw new Error('导出被取消')
 
     const preview = await page.evaluate(
-      async ({ filePath, password }) =>
-        window.miniDiary.invoke('migration:preview', { filePath, packagePassword: password }),
-      { filePath: PACKAGE_PATH, password: demoPassword }
+      async ({ filePath, password, key }) =>
+        window.miniDiary.invoke('migration:preview', {
+          filePath,
+          packagePassword: password,
+          packageKey: key
+        }),
+      { filePath: PACKAGE_PATH, password: demoPassword, key: packageKey }
     )
     if (!preview.ok) throw new Error(`迁移包校验失败：${preview.error.message}`)
+
+    await writeFile(
+      KEY_PATH,
+      `Mini Diary 迁移包附带的公钥（导入时必须一起提供）\n\n` +
+        `${formatPackageKey(packageKey)}\n\n` +
+        `私钥：${demoPassword}\n` +
+        `迁移包：${PACKAGE_PATH}\n` +
+        `生成时间：${new Date().toISOString()}\n`,
+      { mode: 0o600 }
+    )
 
     const info = await stat(PACKAGE_PATH)
     log('完成')
@@ -247,7 +287,9 @@ async function main() {
       `内容：${preview.data.summary.entryCount} 篇日记 · ${preview.data.summary.attachmentCount} 个附件 · ` +
         `${preview.data.summary.firstDate} 至 ${preview.data.summary.lastDate}`
     )
-    log(`导入密码：${demoPassword}`)
+    log(`公钥（私钥之外的必需项）：${formatPackageKey(packageKey)}`)
+    log(`私钥（即导入密码）：${demoPassword}`)
+    log(`公钥已写入：${KEY_PATH}`)
   } finally {
     await app?.close().catch(() => undefined)
     await rm(workDir, { recursive: true, force: true })

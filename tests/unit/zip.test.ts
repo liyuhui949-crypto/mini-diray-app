@@ -155,8 +155,10 @@ describe('迁移包清单与校验文件', () => {
       hasPreferences: true
     }
     expect(parseManifest(JSON.stringify(manifest)).entryCount).toBe(1)
-    expect(() => parseManifest(JSON.stringify({ ...manifest, packageFormat: 2 }))).toThrow(
-      /格式不受支持/
+    // 旧格式（1）仍然可以读，用来导入历史包
+    expect(parseManifest(JSON.stringify({ ...manifest, packageFormat: 1 })).packageFormat).toBe(1)
+    expect(() => parseManifest(JSON.stringify({ ...manifest, packageFormat: 99 }))).toThrow(
+      /更新的版本/
     )
     expect(() => parseManifest('{}')).toThrow()
     expect(() => parseManifest('not json')).toThrow()

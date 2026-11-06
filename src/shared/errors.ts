@@ -16,6 +16,7 @@ export type ErrorCode =
   | 'NOT_ENOUGH_SPACE'
   | 'UNSUPPORTED'
   | 'UPDATE_UNAVAILABLE'
+  | 'PACKAGE_KEY_REQUIRED'
   | 'UNKNOWN'
 
 const defaultMessages: Record<ErrorCode, string> = {
@@ -34,6 +35,7 @@ const defaultMessages: Record<ErrorCode, string> = {
   NOT_ENOUGH_SPACE: copy.errors.notEnoughSpace,
   UNSUPPORTED: '不支持的操作',
   UPDATE_UNAVAILABLE: copy.errors.updateUnavailable,
+  PACKAGE_KEY_REQUIRED: copy.errors.packageKeyRequired,
   UNKNOWN: copy.errors.unknown
 }
 

@@ -20,6 +20,7 @@ let homeB = ''
 let appA: ElectronApplication | null = null
 let appB: ElectronApplication | null = null
 let packagePath = ''
+let packageKey = ''
 
 async function launch(home: string): Promise<{ app: ElectronApplication; page: Page }> {
   const launched = await launchApp(home)
@@ -63,7 +64,13 @@ test('导出迁移包再导入到全新安装', async () => {
 
     await page.getByRole('button', { name: '设置' }).click()
     await page.getByRole('button', { name: '导出…' }).click()
-    await page.locator('#export-password').fill(PACKAGE_PASSWORD)
+    await fillInput(page.locator('#export-password'), PACKAGE_PASSWORD)
+    await page.getByRole('button', { name: '生成公钥' }).click()
+    await expect(page.locator('#package-key')).toBeVisible()
+    packageKey = (await page.locator('#package-key').textContent())?.trim() ?? ''
+    expect(packageKey).toMatch(/^[0-9A-Z-]{39}$/)
+    // 生成公钥后有 5 秒冷静期，倒计时结束才能导出
+    await expect(page.getByRole('button', { name: '开始导出' })).toBeEnabled({ timeout: 15_000 })
     await page.getByRole('button', { name: '开始导出' }).click()
     // 导出完成后对话框切到摘要态：只剩"完成"按钮，并显示包内统计
     await expect(page.getByRole('button', { name: '完成' })).toBeVisible({ timeout: 30_000 })
@@ -88,7 +95,8 @@ test('导出迁移包再导入到全新安装', async () => {
     }, packagePath)
 
     await page.getByRole('button', { name: '选择文件…' }).first().click()
-    await expect(page.locator('#import-password')).toBeVisible()
+    await expect(page.locator('#import-package-key')).toBeVisible()
+    await fillInput(page.locator('#import-package-key'), packageKey)
     await fillInput(page.locator('#import-password'), PACKAGE_PASSWORD)
     await page.getByRole('button', { name: '下一步' }).click()
 

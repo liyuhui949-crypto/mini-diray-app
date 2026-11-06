@@ -18,7 +18,7 @@
 | 搜索 | 标题 + 正文 + 标签，中文子串、多词 AND、标题优先排序、命中高亮 |
 | 统计 | 总条目、每周平均、最长/当前连续、总字数、每篇平均 + 近 12 周柱状图 + 13 周热力图 + 存储占用 |
 | 安全 | 密码解锁、锁屏/挂起立即锁定、可选空闲自动锁定、改密只重包 DEK |
-| 迁移 | `.minidiary` 整库迁移包（ZIP64、replace/merge、staging + 原子切换 + 回滚） |
+| 迁移 | `.minidiary` 整库迁移包（公钥 + 私钥双因子、ZIP64、replace/merge、staging + 原子切换 + 回滚） |
 | 导入导出 | Day One JSON/TXT、jrnl JSON、Mini Diary JSON；导出 JSON / Markdown / PDF / Day One TXT |
 
 ## 快速开始

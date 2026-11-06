@@ -122,6 +122,16 @@ export interface MigrationSummary {
 
 export type MigrationMode = 'replace' | 'merge'
 
+export interface MigrationPackageInfo {
+  packageFormat: number
+  /** 是否必须提供公钥（packageFormat >= 2） */
+  requiresKey: boolean
+  appVersion: string
+  createdAt: string
+  entryCount: number
+  attachmentCount: number
+}
+
 export interface JobProgress {
   jobId: string
   kind: 'attachment' | 'migration-export' | 'migration-import' | 'import' | 'export'

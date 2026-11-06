@@ -15,7 +15,9 @@ import type { ScryptParams } from '../vault/crypto'
 import { rewrapEnvelope } from '../vault/format'
 import { freeSpaceCheck, vaultPaths } from '../vault/paths'
 import type { VaultRepository } from '../vault/repository'
-import { attachmentMember, PACKAGE_MEMBER, formatChecksums } from './package'
+import { composePackageSecret } from '@shared/packageKey'
+
+import { attachmentMember, PACKAGE_FORMAT, PACKAGE_MEMBER, formatChecksums } from './package'
 
 export interface MigrationExportDeps {
   repository: VaultRepository
@@ -27,7 +29,12 @@ export interface MigrationExportDeps {
 
 export interface MigrationExportOptions {
   targetPath: string
+  /** 用户自定的"私钥" */
   packagePassword: string
+  /** 应用生成、只交给用户保存的"公钥"；旧格式（测试用）可为空 */
+  packageKey: string
+  /** 仅测试使用：1 = 生成旧格式包，用来验证向后兼容 */
+  packageFormat?: 1 | 2
   preferences: Preferences
   job: JobHandle
 }
@@ -101,7 +108,7 @@ export async function exportMigrationPackage(
   const writer = new ZipWriter({ filePath: partPath })
   try {
     const manifest = {
-      packageFormat: 1,
+      packageFormat: options.packageFormat ?? PACKAGE_FORMAT,
       appVersion,
       createdAt: summary.createdAt,
       formatVersion: envelope.formatVersion,
@@ -117,12 +124,12 @@ export async function exportMigrationPackage(
     const manifestText = JSON.stringify(manifest, null, 2)
     writer.addBuffer(PACKAGE_MEMBER.manifest, manifestText)
 
-    const rewrap = await rewrapEnvelope(
-      envelope,
-      dek,
-      options.packagePassword,
-      deps.scrypt ?? undefined
-    )
+    // 真正参与 KDF 的是「公钥 + 私钥」组合后的口令；旧格式退回纯密码
+    const secret =
+      (options.packageFormat ?? 2) >= 2
+        ? composePackageSecret(options.packageKey, options.packagePassword)
+        : options.packagePassword
+    const rewrap = await rewrapEnvelope(envelope, dek, secret, deps.scrypt ?? undefined)
     const vaultText = JSON.stringify(rewrap)
     writer.addBuffer(PACKAGE_MEMBER.vault, vaultText)
 

@@ -4,6 +4,7 @@ import path from 'node:path'
 import {
   BrowserWindow,
   app,
+  clipboard,
   dialog,
   ipcMain,
   nativeTheme,
@@ -130,6 +131,10 @@ export function registerIpcHandlers(context: AppContext): void {
     await ensureVaultDirs(vaultPaths(dir))
     const error = await shell.openPath(dir)
     if (error) throw new AppError('IO_ERROR', '无法打开目录')
+  })
+
+  register('app:copyText', async ({ text }) => {
+    clipboard.writeText(text)
   })
 
   register('shell:openExternal', async ({ url }) => {
@@ -303,7 +308,7 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   // ───────────────────────── migration ─────────────────────────
-  register('migration:export', async ({ packagePassword }, event) => {
+  register('migration:export', async ({ packagePassword, packageKey }, event) => {
     const directory = preferences.current.lastExportDir ?? app.getPath('documents')
     const result = await showSave(event, {
       title: copy.migration.exportTitle,
@@ -319,6 +324,7 @@ export function registerIpcHandlers(context: AppContext): void {
         {
           targetPath: result.filePath,
           packagePassword,
+          packageKey,
           preferences: preferences.current,
           job
         }
@@ -332,8 +338,10 @@ export function registerIpcHandlers(context: AppContext): void {
     }
   })
 
-  register('migration:preview', async ({ filePath, packagePassword }) =>
-    context.migrationImport.preview(filePath, packagePassword)
+  register('migration:inspect', async ({ filePath }) => context.migrationImport.inspect(filePath))
+
+  register('migration:preview', async ({ filePath, packagePassword, packageKey }) =>
+    context.migrationImport.preview(filePath, packagePassword, packageKey)
   )
 
   register('migration:import', async ({ token, mode, newPassword }) => {

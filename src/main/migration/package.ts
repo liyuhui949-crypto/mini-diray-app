@@ -13,7 +13,9 @@ export const PACKAGE_MEMBER = {
   attachmentsPrefix: 'attachments/'
 } as const
 
-export const PACKAGE_FORMAT = 1
+/** 当前导出的格式：2 = 需要「公钥 + 私钥」，1 = 旧格式（只靠密码） */
+export const PACKAGE_FORMAT = 2
+export const PACKAGE_FORMAT_V1 = 1
 export const PACKAGE_EXTENSION = 'minidiary'
 export const ATTACHMENT_MEMBER_RE =
   /^attachments\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.mdat$/i
@@ -51,10 +53,18 @@ export function parseManifest(text: string): PackageManifest {
   }
   const parsed = migrationManifestSchema.safeParse(raw)
   if (!parsed.success) throw new AppError('INVALID_INPUT', '迁移包清单字段不完整')
-  if (parsed.data.packageFormat !== PACKAGE_FORMAT) {
-    throw new AppError('VAULT_VERSION_TOO_NEW', '迁移包格式不受支持')
+  if (parsed.data.packageFormat < PACKAGE_FORMAT_V1) {
+    throw new AppError('INVALID_INPUT', '迁移包格式不受支持')
+  }
+  if (parsed.data.packageFormat > PACKAGE_FORMAT) {
+    throw new AppError('VAULT_VERSION_TOO_NEW', '这个迁移包来自更新的版本，请先升级应用')
   }
   return parsed.data
+}
+
+/** 2 及以上的包必须同时提供公钥 */
+export function requiresPackageKey(manifest: PackageManifest): boolean {
+  return manifest.packageFormat >= 2
 }
 
 export function parsePortablePrefs(text: string): PortablePreferences | null {

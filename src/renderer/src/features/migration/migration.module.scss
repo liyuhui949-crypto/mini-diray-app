@@ -1,3 +1,73 @@
+.passwordRow {
+  position: relative;
+  display: flex;
+
+  input {
+    padding-right: 38px;
+  }
+}
+
+.reveal {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-text-tertiary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+
+  &:hover {
+    background: var(--md-bg-sunken);
+    color: var(--md-text-primary);
+  }
+}
+
+.keyInput {
+  font-family: var(--md-font-mono);
+  letter-spacing: 0.06em;
+}
+
+.keyBox {
+  margin: 4px 0 16px;
+  padding: 14px;
+  border: 1px solid var(--md-border-subtle);
+  border-radius: 10px;
+  background: var(--md-bg-app);
+}
+
+.keyBoxHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--md-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.keyValue {
+  display: block;
+  font-family: var(--md-font-mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--md-accent);
+  word-break: break-all;
+  line-height: 1.6;
+  user-select: all;
+}
+
+.keyWarning {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--md-warn);
+  line-height: 1.7;
+}
+
 .path {
   font-family: var(--md-font-mono);
   font-size: 11.5px;

@@ -1608,7 +1608,15 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 删除整个库并回到引导页的能力（`vault:delete`、`repository.deleteVault`、设置页「删除日记」、`DeleteVaultDialog`）已移除；
   想彻底清空也可以直接删除日记目录（目录路径在设置里可见）。
 
-### 15.6 已修复问题
+### 15.6 迁移包改为「公钥 + 私钥」双因子（ADR 0004）
+
+- 导出时生成 32 位高熵**公钥**（约 157 bit，不写进包、应用不保存），用户自定义密码作为**私钥**；
+- KDF 输入是两者的组合串，包被单独拿走时无法离线爆破私钥；
+- 公钥支持一键复制，私钥支持显示/隐藏；生成公钥后 5 秒冷静期才允许导出；
+- 导入按 `packageFormat` 决定是否需要公钥：2 需公钥，1（旧包）仍只要密码；
+- 新增 IPC：`migration:inspect`（只读清单）、`app:copyText`；`migration:export/preview` 增加 `packageKey`。
+
+### 15.7 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|

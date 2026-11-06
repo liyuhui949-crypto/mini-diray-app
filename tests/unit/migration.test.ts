@@ -16,6 +16,8 @@ import { VaultRepository } from '../../src/main/vault/repository'
 const FAST = { N: 1024, r: 8, p: 1 }
 const PASSWORD = 'source-password-1234'
 const PACKAGE_PASSWORD = 'package-password-1234'
+/** 32 位、只含公钥字母表字符 */
+const PACKAGE_KEY = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ23-4567-89AB'
 const NEW_PASSWORD = 'imported-password-1234'
 
 const PNG = Buffer.from([
@@ -87,6 +89,7 @@ async function exportSource(source: Source, targetPath: string): Promise<void> {
     {
       targetPath,
       packagePassword: PACKAGE_PASSWORD,
+      packageKey: PACKAGE_KEY,
       preferences: preferences(source.dir),
       job: job()
     }
@@ -136,11 +139,11 @@ describe('迁移包 roundtrip', () => {
       const store = new AttachmentStore(targetDir, () => repo.getAttachmentKey())
       const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
 
-      await expect(importer.preview(packagePath, 'wrong-package-password')).rejects.toMatchObject({
-        code: 'WRONG_PASSWORD'
-      })
+      await expect(
+        importer.preview(packagePath, 'wrong-package-password', PACKAGE_KEY)
+      ).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
 
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
       expect(preview.summary.entryCount).toBe(1)
       expect(preview.summary.attachmentCount).toBe(1)
       expect(preview.summary.firstDate).toBe('2026-11-06')
@@ -175,6 +178,71 @@ describe('迁移包 roundtrip', () => {
       }
       expect(Buffer.concat(restored).equals(source.payload)).toBe(true)
       expect(await store.verify(entry!.attachments[0]!)).toBe(true)
+    } finally {
+      await rm(source.dir, { recursive: true, force: true })
+      await rm(pkgDir, { recursive: true, force: true })
+      await rm(targetDir, { recursive: true, force: true })
+    }
+  })
+
+  it('没有公钥不能导入；公钥错误与私钥错误提示一致', async () => {
+    const source = await makeSource()
+    const pkgDir = await tempDir('minidiary-pkg-')
+    const targetDir = await tempDir('minidiary-dst-')
+    try {
+      const packagePath = path.join(pkgDir, 'bundle.minidiary')
+      await exportSource(source, packagePath)
+      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      const importer = new MigrationImporter({
+        repository: repo,
+        store: new AttachmentStore(targetDir, () => repo.getAttachmentKey()),
+        scrypt: FAST
+      })
+
+      const info = await importer.inspect(packagePath)
+      expect(info.requiresKey).toBe(true)
+      expect(info.packageFormat).toBe(2)
+
+      await expect(importer.preview(packagePath, PACKAGE_PASSWORD)).rejects.toMatchObject({
+        code: 'PACKAGE_KEY_REQUIRED'
+      })
+      await expect(
+        importer.preview(packagePath, PACKAGE_PASSWORD, 'ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ')
+      ).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
+      await expect(importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)).resolves.toBeTruthy()
+    } finally {
+      await rm(source.dir, { recursive: true, force: true })
+      await rm(pkgDir, { recursive: true, force: true })
+      await rm(targetDir, { recursive: true, force: true })
+    }
+  })
+
+  it('旧格式（packageFormat 1）仍然只需要密码', async () => {
+    const source = await makeSource()
+    const pkgDir = await tempDir('minidiary-pkg-')
+    const targetDir = await tempDir('minidiary-dst-')
+    try {
+      const packagePath = path.join(pkgDir, 'legacy.minidiary')
+      await exportMigrationPackage(
+        { repository: source.repo, store: source.store, appVersion: '4.0.0', scrypt: FAST },
+        {
+          targetPath: packagePath,
+          packagePassword: PACKAGE_PASSWORD,
+          packageKey: '',
+          packageFormat: 1,
+          preferences: preferences(source.dir),
+          job: job()
+        }
+      )
+      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      const importer = new MigrationImporter({
+        repository: repo,
+        store: new AttachmentStore(targetDir, () => repo.getAttachmentKey()),
+        scrypt: FAST
+      })
+      expect((await importer.inspect(packagePath)).requiresKey).toBe(false)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      expect(preview.summary.entryCount).toBe(1)
     } finally {
       await rm(source.dir, { recursive: true, force: true })
       await rm(pkgDir, { recursive: true, force: true })
@@ -247,7 +315,7 @@ describe('迁移包 roundtrip', () => {
 
       const store = new AttachmentStore(targetDir, () => repo.getAttachmentKey())
       const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
       const packageCipher = await readFile(
         path.join(source.dir, 'attachments', `${source.attachmentId}.mdat`)
       )
@@ -306,7 +374,7 @@ describe('迁移包 roundtrip', () => {
 
       const store = new AttachmentStore(targetDir, () => repo.getAttachmentKey())
       const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
       const result = await importer.run({
         token: preview.token,
         mode: 'merge',
@@ -360,7 +428,7 @@ describe('迁移包 roundtrip', () => {
       await repo.flush()
 
       const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
       const result = await importer.run({
         token: preview.token,
         mode: 'merge',
@@ -405,6 +473,7 @@ describe('迁移包 roundtrip', () => {
           {
             targetPath: path.join(pkgDir, 'broken.minidiary'),
             packagePassword: PACKAGE_PASSWORD,
+            packageKey: PACKAGE_KEY,
             preferences: preferences(source.dir),
             job: job()
           }
@@ -441,7 +510,7 @@ describe('迁移包 roundtrip', () => {
       const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
       const store = new AttachmentStore(targetDir, () => repo.getAttachmentKey())
       const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
       expect(preview.summary.attachmentCount).toBe(2)
       await importer.run({
         token: preview.token,

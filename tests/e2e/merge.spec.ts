@@ -72,6 +72,10 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
   await page.getByRole('button', { name: '设置' }).click()
   await page.getByRole('button', { name: '导出…' }).click()
   await fillInput(page.locator('#export-password'), PACKAGE_PASSWORD)
+  await page.getByRole('button', { name: '生成公钥' }).click()
+  await expect(page.locator('#package-key')).toBeVisible()
+  const packageKey = (await page.locator('#package-key').textContent())?.trim() ?? ''
+  await expect(page.getByRole('button', { name: '开始导出' })).toBeEnabled({ timeout: 15_000 })
   await page.getByRole('button', { name: '开始导出' }).click()
   await expect(page.getByRole('button', { name: '完成' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: '完成' }).click()
@@ -104,6 +108,7 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
   await page.getByRole('button', { name: '设置' }).click()
   await page.getByRole('button', { name: '导入…' }).click()
   await page.getByRole('button', { name: '选择文件…' }).first().click()
+  await fillInput(page.locator('#import-package-key'), packageKey)
   await fillInput(page.locator('#import-password'), PACKAGE_PASSWORD)
   await page.getByRole('button', { name: '下一步' }).click()
   await expect(page.locator('#import-new')).toBeVisible({ timeout: 20_000 })

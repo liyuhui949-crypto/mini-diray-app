@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+import { Check, Copy, Eye, EyeOff } from 'lucide-react'
 
 import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
+import { formatPackageKey, generatePackageKey, normalizePackageKey } from '@shared/packageKey'
 import type { MigrationSummary } from '@shared/types'
 
 import { call, errorMessage } from '@/api/client'
@@ -11,7 +14,10 @@ import { useVaultStore } from '@/stores/vault'
 
 import styles from './migration.module.scss'
 
-type Phase = 'form' | 'running' | 'done'
+type Phase = 'form' | 'key' | 'running' | 'done'
+
+/** 生成公钥后强制停留的秒数：留给用户"抄下来"的时间 */
+const THINK_SECONDS = 5
 
 export function MigrationExportDialog({
   open,
@@ -21,30 +27,83 @@ export function MigrationExportDialog({
   onClose: () => void
 }): React.JSX.Element {
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [packageKey, setPackageKey] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [countdown, setCountdown] = useState(THINK_SECONDS)
   const [phase, setPhase] = useState<Phase>('form')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ path: string; summary: MigrationSummary } | null>(null)
   const busy = useVaultStore((state) => state.busy)
   const pushToast = useUiStore((state) => state.pushToast)
+  const copiedTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (!open) {
       setPassword('')
+      setShowPassword(false)
+      setPackageKey('')
+      setCopied(false)
+      setCountdown(THINK_SECONDS)
       setPhase('form')
       setError(null)
       setResult(null)
     }
   }, [open])
 
-  const submit = async (): Promise<void> => {
+  // 公钥出现后倒计时，5 秒内不允许导出
+  useEffect(() => {
+    if (phase !== 'key') return
+    setCountdown(THINK_SECONDS)
+    const timer = window.setInterval(() => {
+      setCountdown((value) => {
+        if (value <= 1) {
+          window.clearInterval(timer)
+          return 0
+        }
+        return value - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [phase])
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
+    },
+    []
+  )
+
+  const goToKey = (): void => {
     if (password.length < 8) {
-      setError('迁移包密码至少 8 位')
+      setError('私钥至少 8 位')
       return
     }
+    setError(null)
+    setPackageKey(generatePackageKey())
+    setCopied(false)
+    setPhase('key')
+  }
+
+  const copyKey = async (): Promise<void> => {
+    try {
+      await call('app:copyText', { text: formatPackageKey(packageKey) })
+      setCopied(true)
+      if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 2500)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const submit = async (): Promise<void> => {
     setPhase('running')
     setError(null)
     try {
-      const exported = await call('migration:export', { packagePassword: password })
+      const exported = await call('migration:export', {
+        packagePassword: password,
+        packageKey: normalizePackageKey(packageKey)
+      })
       if (!exported.path || !exported.summary) {
         setPhase('form')
         return
@@ -54,7 +113,7 @@ export function MigrationExportDialog({
       pushToast(copy.migration.exportDone)
     } catch (err) {
       setError(errorMessage(err))
-      setPhase('form')
+      setPhase('key')
     }
   }
 
@@ -63,15 +122,23 @@ export function MigrationExportDialog({
     if (jobId) void call('migration:cancel', { jobId })
   }
 
+  const keyDisplay = packageKey ? formatPackageKey(packageKey) : ''
+
   return (
     <Dialog
       open={open}
       onOpenChange={(value) => {
         if (!value) onClose()
       }}
-      width={560}
-      title={copy.migration.exportTitle}
-      description={phase === 'form' ? copy.migration.exportSubtitle : undefined}
+      width={580}
+      title={phase === 'key' || phase === 'done' ? copy.migration.keyTitle : copy.migration.exportTitle}
+      description={
+        phase === 'form'
+          ? copy.migration.exportSubtitle
+          : phase === 'key'
+            ? copy.migration.keyDescription
+            : undefined
+      }
       footer={
         phase === 'done' ? (
           <Button variant="primary" onClick={onClose}>
@@ -81,11 +148,18 @@ export function MigrationExportDialog({
           <Button variant="danger" onClick={cancel}>
             {copy.common.cancel}
           </Button>
+        ) : phase === 'key' ? (
+          <>
+            <Button onClick={onClose}>{copy.common.cancel}</Button>
+            <Button variant="primary" disabled={countdown > 0} onClick={() => void submit()}>
+              {countdown > 0 ? copy.migration.keyCooldown(countdown) : copy.migration.exportStart}
+            </Button>
+          </>
         ) : (
           <>
             <Button onClick={onClose}>{copy.common.cancel}</Button>
-            <Button variant="primary" onClick={() => void submit()} disabled={password.length === 0}>
-              {copy.migration.exportStart}
+            <Button variant="primary" disabled={password.length === 0} onClick={goToKey}>
+              {copy.migration.exportNext}
             </Button>
           </>
         )
@@ -98,17 +172,48 @@ export function MigrationExportDialog({
             hint={copy.migration.exportPasswordHint}
             htmlFor="export-password"
           >
-            <Input
-              id="export-password"
-              type="password"
-              autoComplete="new-password"
-              placeholder={copy.migration.exportPasswordPlaceholder}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+            <div className={styles.passwordRow}>
+              <Input
+                id="export-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                placeholder={copy.migration.exportPasswordPlaceholder}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && password.length > 0) goToKey()
+                }}
+              />
+              <button
+                type="button"
+                className={styles.reveal}
+                aria-label={showPassword ? '隐藏私钥' : '显示私钥'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
           </Field>
-          {error ? <p className={uiStyles.error}>{error}</p> : null}
+
         </>
+      ) : null}
+
+      {phase === 'key' || phase === 'done' ? (
+        <div className={styles.keyBox}>
+          <div className={styles.keyBoxHead}>
+            <span>{copy.migration.keyLabel}</span>
+            <Button size="sm" onClick={() => void copyKey()}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? copy.migration.keyCopied : copy.migration.copyKey}
+            </Button>
+          </div>
+          <code className={styles.keyValue} id="package-key">
+            {keyDisplay}
+          </code>
+          <p className={styles.keyWarning}>{copy.migration.keyWarning}</p>
+          {phase === 'done' ? <p className={styles.hint}>{copy.migration.keyDoneHint}</p> : null}
+        </div>
       ) : null}
 
       {phase === 'running' ? (
@@ -132,6 +237,8 @@ export function MigrationExportDialog({
           <p className={styles.hint}>{copy.migration.exportPathHint}</p>
         </div>
       ) : null}
+
+      {error ? <p className={uiStyles.error}>{error}</p> : null}
     </Dialog>
   )
 }

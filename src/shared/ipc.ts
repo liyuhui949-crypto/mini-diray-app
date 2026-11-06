@@ -13,6 +13,7 @@ import type {
   JobProgress,
   MenuCommand,
   MigrationMode,
+  MigrationPackageInfo,
   MigrationSummary,
   Preferences,
   StorageStats,
@@ -71,6 +72,7 @@ export interface IpcContract {
   'app:checkForUpdates': { req: void; res: void }
   'app:openDiaryDir': { req: void; res: void }
   'shell:openExternal': { req: { url: string }; res: void }
+  'app:copyText': { req: { text: string }; res: void }
 
   'vault:create': { req: { password: string }; res: VaultSnapshot }
   'vault:unlock': { req: { password: string }; res: VaultSnapshot }
@@ -110,11 +112,15 @@ export interface IpcContract {
   }
 
   'migration:export': {
-    req: { packagePassword: string }
+    req: { packagePassword: string; packageKey: string }
     res: { path: string | null; summary: MigrationSummary | null }
   }
+  'migration:inspect': {
+    req: { filePath: string }
+    res: MigrationPackageInfo
+  }
   'migration:preview': {
-    req: { filePath: string; packagePassword: string }
+    req: { filePath: string; packagePassword: string; packageKey?: string }
     res: { token: string; summary: MigrationSummary }
   }
   'migration:import': {
@@ -198,10 +204,18 @@ export const requestValidators: RequestValidators = {
       .object({ purpose: z.enum(['import', 'migration']), format: importFormatSchema.optional() })
       .parse(payload) as IpcContract['dialog:openFile']['req'],
   'migration:export': (payload) =>
-    z.object({ packagePassword: passwordSchema }).parse(payload) as IpcContract['migration:export']['req'],
+    z
+      .object({ packagePassword: passwordSchema, packageKey: z.string().min(20).max(80) })
+      .parse(payload) as IpcContract['migration:export']['req'],
+  'migration:inspect': (payload) =>
+    z.object({ filePath: optionalString }).parse(payload) as IpcContract['migration:inspect']['req'],
   'migration:preview': (payload) =>
     z
-      .object({ filePath: optionalString, packagePassword: z.string().min(1).max(200) })
+      .object({
+        filePath: optionalString,
+        packagePassword: z.string().min(1).max(200),
+        packageKey: z.string().max(80).optional()
+      })
       .parse(payload) as IpcContract['migration:preview']['req'],
   'migration:import': (payload) =>
     z
@@ -227,6 +241,8 @@ export const requestValidators: RequestValidators = {
       .parse(payload) as IpcContract['export:run']['req'],
   'shell:openExternal': (payload) =>
     z.object({ url: z.string().url().startsWith('https:') }).parse(payload) as IpcContract['shell:openExternal']['req'],
+  'app:copyText': (payload) =>
+    z.object({ text: z.string().min(1).max(10_000) }).parse(payload) as IpcContract['app:copyText']['req'],
 }
 
 /** 渲染进程可用的桥接 API（由 preload 通过 contextBridge 暴露） */

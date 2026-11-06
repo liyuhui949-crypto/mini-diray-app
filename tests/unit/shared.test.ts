@@ -13,6 +13,15 @@ import {
 } from '@shared/merge'
 import { escapeHtml, renderMarkdownToHtml } from '@shared/markdown'
 import { isValidLocalDate, normalizeTags, passwordSchema, preferencesSchema } from '@shared/schemas'
+import {
+  PACKAGE_KEY_ALPHABET,
+  PACKAGE_KEY_LENGTH,
+  composePackageSecret,
+  formatPackageKey,
+  generatePackageKey,
+  isValidPackageKey,
+  normalizePackageKey
+} from '@shared/packageKey'
 import type { Attachment, DiaryEntry } from '@shared/types'
 
 function entry(partial: Partial<DiaryEntry> & { date: string }): DiaryEntry {
@@ -315,5 +324,43 @@ describe('Schema 与标签规范化', () => {
   it('日期校验拒绝 2 月 30 日', () => {
     expect(isValidLocalDate('2026-02-30')).toBe(false)
     expect(isValidLocalDate('2026-02-28')).toBe(true)
+  })
+})
+
+
+describe('迁移包公钥', () => {
+  it('生成的公钥长度为 32 且只含约定字母表字符', () => {
+    const key = generatePackageKey()
+    expect(key).toHaveLength(PACKAGE_KEY_LENGTH)
+    for (const char of key) expect(PACKAGE_KEY_ALPHABET).toContain(char)
+    expect(isValidPackageKey(key)).toBe(true)
+    expect(generatePackageKey()).not.toBe(key)
+  })
+
+  it('展示分组、导入时忽略短横线与大小写', () => {
+    const key = `${PACKAGE_KEY_ALPHABET}23`
+    expect(key).toHaveLength(32)
+    expect(formatPackageKey(key)).toBe('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23')
+    expect(normalizePackageKey('abcd-efgh jkmn_pqrs')).toBe('ABCDEFGHJKMNPQRS')
+    expect(isValidPackageKey(formatPackageKey(key))).toBe(true)
+    expect(isValidPackageKey('2345-6789-abcd-efgh-jkmn-pqrs-tvwx-yz23')).toBe(true)
+  })
+
+  it('拒绝长度不对或含歧义字符的公钥', () => {
+    expect(isValidPackageKey('')).toBe(false)
+    expect(isValidPackageKey('ABCD-EFGH')).toBe(false)
+    // 0 / I 不在字母表里，长度再怎么够也不合法
+    expect(isValidPackageKey('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-Y0ZZ')).toBe(false)
+    expect(isValidPackageKey('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YIZZ')).toBe(false)
+  })
+
+  it('公钥与私钥组合后才是真正参与派生的口令', () => {
+    const first = composePackageSecret('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23', 'password-1')
+    const sameNormalized = composePackageSecret('23456789abcdefghjkmnpqrstvwxyz23', 'password-1')
+    const otherKey = composePackageSecret('ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ', 'password-1')
+    const otherPassword = composePackageSecret('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23', 'password-2')
+    expect(first).toBe(sameNormalized)
+    expect(first).not.toBe(otherKey)
+    expect(first).not.toBe(otherPassword)
   })
 })
