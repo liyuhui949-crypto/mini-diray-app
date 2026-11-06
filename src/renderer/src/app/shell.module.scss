@@ -159,13 +159,53 @@
     }
   }
 
-  kbd {
-    font-family: var(--md-font-mono);
-    font-size: 10px;
+  &[data-pending='true'] {
+    border-color: var(--md-accent);
+  }
+}
+
+/* 待检索：高亮的"去检索"按钮 + 微型旋转指示 */
+.searchGo {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: var(--md-accent);
+  color: var(--md-accent-fg);
+  cursor: pointer;
+  transition: background var(--md-dur) var(--md-ease);
+
+  &:hover {
+    filter: brightness(1.08);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  &:disabled {
+    background: transparent;
     color: var(--md-text-tertiary);
-    border: 1px solid var(--md-border-subtle);
-    border-radius: 4px;
-    padding: 1px 4px;
+    cursor: default;
+
+    &:hover {
+      filter: none;
+    }
+  }
+}
+
+.searchSpin {
+  flex: none;
+  color: var(--md-accent);
+  animation: searchSpin 1s linear infinite;
+}
+
+@keyframes searchSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

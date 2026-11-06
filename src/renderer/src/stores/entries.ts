@@ -48,6 +48,9 @@ interface EntriesState {
   saveState: SaveState
   savedAt: string | null
   saveError: string | null
+  /** 输入框里的原始内容（未提交） */
+  searchInput: string
+  /** 已提交、用于列表过滤与分析的检索词 */
   searchQuery: string
   activeTag: string | null
   loadSnapshot: (snapshot: VaultSnapshot) => void
@@ -58,7 +61,9 @@ interface EntriesState {
   removeAttachment: (id: string) => void
   replaceDraft: (draft: EntryDraft) => void
   flush: () => Promise<void>
-  setQuery: (query: string) => void
+  setSearchInput: (value: string) => void
+  commitSearch: (value?: string) => void
+  clearSearch: () => void
   setTag: (tag: string | null) => void
   deleteActive: () => Promise<void>
   wordCount: () => number
@@ -71,6 +76,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   saveState: 'saved',
   savedAt: null,
   saveError: null,
+  searchInput: '',
   searchQuery: '',
   activeTag: null,
 
@@ -93,6 +99,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       saveState: 'saved',
       savedAt: null,
       saveError: null,
+      searchInput: '',
       searchQuery: '',
       activeTag: null
     }),
@@ -202,7 +209,13 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     }
   },
 
-  setQuery: (searchQuery) => set({ searchQuery }),
+  setSearchInput: (searchInput) => set({ searchInput }),
+  // 提交就是"检索"：输入框内容与检索词对齐，列表与分析同时更新
+  commitSearch: (value) => {
+    const searchInput = value ?? get().searchInput
+    set({ searchInput, searchQuery: searchInput.trim() })
+  },
+  clearSearch: () => set({ searchInput: '', searchQuery: '' }),
   setTag: (activeTag) => set({ activeTag }),
 
   deleteActive: async () => {

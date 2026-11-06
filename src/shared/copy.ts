@@ -104,7 +104,6 @@ export const copy = {
 
   sidebar: {
     searchPlaceholder: '搜索标题和正文',
-    searchShortcut: '⌘F',
     calendar: '日历',
     tags: '标签',
     stats: '统计',
@@ -116,6 +115,31 @@ export const copy = {
     jumpToDate: '跳转到日期',
     noTags: '还没有标签',
     entryCountCalendar: (n: number) => `${n} 篇`
+  },
+
+  search: {
+    run: '检索',
+    runHint: '检索（也可以按回车）',
+    pending: '待检索',
+    placeholder: '搜索标题和正文',
+    heroLabel: '命中篇数',
+    heroUnit: '篇',
+    /** 每个年份一段：yyyy-mm-dd n 篇命中，年份之间用；分隔 */
+    heroSub: (years: number, parts: readonly string[]) =>
+      `跨 ${years} 个年份${parts.length > 0 ? ` · ${parts.join('；')}` : ''}`,
+    yearHits: (n: number) => `${n} 篇命中`,
+    timelineTitle: '命中的月份',
+    timelineHintMonth: '按月 · 从最早到最近一篇',
+    timelineHintYear: '按年 · 跨度较大时聚合',
+    timelineBar: (label: string, n: number) => `${label} · ${n} 篇`,
+    evidenceTitle: (n: number) => `命中篇数 ${n}`,
+    yearHead: (year: string, n: number) => `${year} 年 · ${n} 篇`,
+    previewNote: (n: number, q: string) => `正文中 ${n} 处提到「${q}」`,
+    previewNoteEmpty: '预览不会打断当前检索',
+    openInDiary: '在日记中打开',
+    hitCount: (n: number) => `命中 ${n} 处`,
+    jumpedToMonth: (label: string) => `日历已切到 ${label}`,
+    tooLong: (limit: number) => `关键词太长，按前 ${limit} 个字搜索`
   },
 
   list: {

@@ -2,7 +2,14 @@ import { todayLocalDate } from '@shared/date'
 import type { LocalDate } from '@shared/types'
 import { create } from 'zustand'
 
-export type ViewName = 'editor' | 'stats' | 'settings'
+export type ViewName = 'editor' | 'stats' | 'settings' | 'search'
+
+/** 「在日记中打开」的一次性请求：跳到某天并把检索词标出来 */
+export interface SearchJump {
+  date: LocalDate
+  query: string
+  seq: number
+}
 
 /** 条目列表的取数范围：跟随日历月份，或展示全部 */
 export type ListScope = 'month' | 'all'
@@ -46,7 +53,14 @@ interface UiState {
   focusSearchSeq: number
   attachmentRequestSeq: number
   pendingPackagePath: string | null
+  /** 搜索结果里点开的预览对话框（列表与洞察共用） */
+  searchPreviewDate: LocalDate | null
+  searchJump: SearchJump | null
   setView: (view: ViewName) => void
+  openSearchPreview: (date: LocalDate) => void
+  closeSearchPreview: () => void
+  requestSearchJump: (date: LocalDate, query: string) => void
+  clearSearchJump: () => void
   setPreviewMode: (preview: boolean) => void
   setCalendarMonth: (month: LocalDate) => void
   setListScope: (scope: ListScope) => void
@@ -76,7 +90,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   focusSearchSeq: 0,
   attachmentRequestSeq: 0,
   pendingPackagePath: null,
+  searchPreviewDate: null,
+  searchJump: null,
   setView: (view) => set({ view, dialog: null }),
+  openSearchPreview: (searchPreviewDate) => set({ searchPreviewDate }),
+  closeSearchPreview: () => set({ searchPreviewDate: null }),
+  requestSearchJump: (date, query) =>
+    set((state) => ({
+      searchJump: { date, query, seq: (state.searchJump?.seq ?? 0) + 1 }
+    })),
+  clearSearchJump: () => set({ searchJump: null }),
   setPreviewMode: (previewMode) => set({ previewMode }),
   setCalendarMonth: (calendarMonth) => set({ calendarMonth }),
   setListScope: (listScope) => set({ listScope }),
