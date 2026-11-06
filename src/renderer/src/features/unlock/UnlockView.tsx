@@ -6,6 +6,7 @@ import { copy } from '@shared/copy'
 import { AppError } from '@shared/errors'
 
 import { call, errorMessage } from '@/api/client'
+import { PasswordInput } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useVaultStore } from '@/stores/vault'
 
@@ -65,11 +66,10 @@ export function UnlockView(): React.JSX.Element {
           <label className={styles.label} htmlFor="unlock-password">
             {copy.unlock.passwordLabel}
           </label>
-          <input
+          <PasswordInput
             id="unlock-password"
             ref={inputRef}
-            className={`${styles.input} ${styles.passwordInput}`}
-            type="password"
+            className={styles.passwordInput}
             autoComplete="current-password"
             value={password}
             placeholder={copy.unlock.placeholder}

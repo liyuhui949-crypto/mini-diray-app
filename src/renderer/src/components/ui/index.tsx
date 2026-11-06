@@ -1,6 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Eye, EyeOff } from 'lucide-react'
 import {
   forwardRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -74,6 +76,39 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
     return <input ref={ref} className={[styles.input, className].filter(Boolean).join(' ')} {...rest} />
+  }
+)
+
+interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
+  /** 外层容器，用于在特殊布局里补 padding 等 */
+  containerClassName?: string
+}
+
+/** 带"显示/隐藏"切换的密码框：所有密码输入都走这个组件 */
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
+  function PasswordInput({ className, containerClassName, ...rest }, ref) {
+    const [visible, setVisible] = useState(false)
+    const label = visible ? copy.common.hidePassword : copy.common.showPassword
+    return (
+      <div className={[styles.passwordField, containerClassName].filter(Boolean).join(' ')}>
+        <input
+          ref={ref}
+          type={visible ? 'text' : 'password'}
+          className={[styles.input, styles.passwordInput, className].filter(Boolean).join(' ')}
+          {...rest}
+        />
+        <button
+          type="button"
+          className={styles.passwordToggle}
+          aria-label={label}
+          title={label}
+          aria-pressed={visible}
+          onClick={() => setVisible((value) => !value)}
+        >
+          {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </div>
+    )
   }
 )
 

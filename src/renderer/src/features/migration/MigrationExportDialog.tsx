@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { Check, Copy, Eye, EyeOff } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 
 import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
@@ -8,7 +8,7 @@ import { formatPackageKey, generatePackageKey, normalizePackageKey } from '@shar
 import type { MigrationSummary } from '@shared/types'
 
 import { call, errorMessage } from '@/api/client'
-import { Button, Dialog, Field, Input, Progress, uiStyles } from '@/components/ui'
+import { Button, Dialog, Field, PasswordInput, Progress, uiStyles } from '@/components/ui'
 import { useUiStore } from '@/stores/ui'
 import { useVaultStore } from '@/stores/vault'
 
@@ -27,7 +27,6 @@ export function MigrationExportDialog({
   onClose: () => void
 }): React.JSX.Element {
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [packageKey, setPackageKey] = useState('')
   const [copied, setCopied] = useState(false)
   const [countdown, setCountdown] = useState(THINK_SECONDS)
@@ -41,7 +40,6 @@ export function MigrationExportDialog({
   useEffect(() => {
     if (!open) {
       setPassword('')
-      setShowPassword(false)
       setPackageKey('')
       setCopied(false)
       setCountdown(THINK_SECONDS)
@@ -172,28 +170,16 @@ export function MigrationExportDialog({
             hint={copy.migration.exportPasswordHint}
             htmlFor="export-password"
           >
-            <div className={styles.passwordRow}>
-              <Input
-                id="export-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                placeholder={copy.migration.exportPasswordPlaceholder}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && password.length > 0) goToKey()
-                }}
-              />
-              <button
-                type="button"
-                className={styles.reveal}
-                aria-label={showPassword ? '隐藏私钥' : '显示私钥'}
-                aria-pressed={showPassword}
-                onClick={() => setShowPassword((value) => !value)}
-              >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
+            <PasswordInput
+              id="export-password"
+              autoComplete="new-password"
+              placeholder={copy.migration.exportPasswordPlaceholder}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && password.length > 0) goToKey()
+              }}
+            />
           </Field>
 
         </>

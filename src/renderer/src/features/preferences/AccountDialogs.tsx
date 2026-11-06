@@ -4,7 +4,7 @@ import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
 
 import { call, errorMessage } from '@/api/client'
-import { Button, Dialog, Field, Input, uiStyles } from '@/components/ui'
+import { Button, Dialog, Field, Input, PasswordInput, uiStyles } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
 
@@ -72,27 +72,24 @@ export function ChangePasswordDialog({
       }
     >
       <Field label={copy.changePassword.current} htmlFor="pwd-current">
-        <Input
+        <PasswordInput
           id="pwd-current"
-          type="password"
           autoComplete="current-password"
           value={current}
           onChange={(event) => setCurrent(event.target.value)}
         />
       </Field>
       <Field label={copy.changePassword.next} htmlFor="pwd-next">
-        <Input
+        <PasswordInput
           id="pwd-next"
-          type="password"
           autoComplete="new-password"
           value={next}
           onChange={(event) => setNext(event.target.value)}
         />
       </Field>
       <Field label={copy.changePassword.confirm} htmlFor="pwd-confirm">
-        <Input
+        <PasswordInput
           id="pwd-confirm"
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
@@ -165,9 +162,8 @@ export function ResetVaultDialog({
       }
     >
       <Field label="日记密码" htmlFor="reset-password">
-        <Input
+        <PasswordInput
           id="reset-password"
-          type="password"
           autoComplete="current-password"
           value={state.password}
           onChange={(event) => setState({ ...state, password: event.target.value })}

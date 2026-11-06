@@ -18,6 +18,8 @@ export const copy = {
     back: '返回',
     next: '下一步',
     done: '完成',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     start: '开始',
     loading: '处理中…',
     empty: '暂无内容',

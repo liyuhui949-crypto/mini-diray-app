@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 
-import { Eye, EyeOff } from 'lucide-react'
-
 import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
 import { isValidPackageKey, normalizePackageKey } from '@shared/packageKey'
 import type { MigrationMode, MigrationSummary } from '@shared/types'
 
 import { call, errorMessage } from '@/api/client'
-import { Button, Dialog, Field, Input, Progress, Select, uiStyles } from '@/components/ui'
+import { Button, Dialog, Field, Input, PasswordInput, Progress, Select, uiStyles } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
 import { useVaultStore } from '@/stores/vault'
@@ -28,7 +26,6 @@ export function MigrationImportDialog({
   const [step, setStep] = useState<Step>('pick')
   const [filePath, setFilePath] = useState<string>('')
   const [packagePassword, setPackagePassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [packageKey, setPackageKey] = useState('')
   const [requiresKey, setRequiresKey] = useState(false)
   const [mode, setMode] = useState<MigrationMode>('replace')
@@ -48,7 +45,6 @@ export function MigrationImportDialog({
       setStep('pick')
       setFilePath(pendingPackage ?? '')
       setPackagePassword('')
-      setShowPassword(false)
       setPackageKey('')
       setRequiresKey(false)
       setMode('replace')
@@ -213,28 +209,16 @@ export function MigrationImportDialog({
           )}
 
           <Field label={copy.migration.importPasswordLabel} htmlFor="import-password">
-            <div className={styles.passwordRow}>
-              <Input
-                id="import-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="off"
-                placeholder={copy.migration.importPasswordPlaceholder}
-                value={packagePassword}
-                onChange={(event) => setPackagePassword(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && packagePassword) void preview()
-                }}
-              />
-              <button
-                type="button"
-                className={styles.reveal}
-                aria-label={showPassword ? '隐藏私钥' : '显示私钥'}
-                aria-pressed={showPassword}
-                onClick={() => setShowPassword((value) => !value)}
-              >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
+            <PasswordInput
+              id="import-password"
+              autoComplete="off"
+              placeholder={copy.migration.importPasswordPlaceholder}
+              value={packagePassword}
+              onChange={(event) => setPackagePassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && packagePassword) void preview()
+              }}
+            />
           </Field>
           {error ? <p className={uiStyles.error}>{error}</p> : null}
         </>

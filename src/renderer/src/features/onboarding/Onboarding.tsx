@@ -5,6 +5,7 @@ import { Lock, PackageOpen } from 'lucide-react'
 import { copy } from '@shared/copy'
 
 import { call, errorMessage } from '@/api/client'
+import { PasswordInput } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
 import { useVaultStore } from '@/stores/vault'
@@ -76,10 +77,9 @@ export function Onboarding(): React.JSX.Element {
           <label className={styles.label} htmlFor="new-password">
             {copy.onboarding.passwordLabel}
           </label>
-          <input
+          <PasswordInput
             id="new-password"
-            className={`${styles.input} ${styles.passwordInput}`}
-            type="password"
+            className={styles.passwordInput}
             autoFocus
             autoComplete="new-password"
             value={password}
@@ -101,10 +101,9 @@ export function Onboarding(): React.JSX.Element {
           <label className={styles.label} htmlFor="confirm-password">
             {copy.onboarding.confirmLabel}
           </label>
-          <input
+          <PasswordInput
             id="confirm-password"
-            className={`${styles.input} ${styles.passwordInput}`}
-            type="password"
+            className={styles.passwordInput}
             autoComplete="new-password"
             value={confirm}
             placeholder={copy.onboarding.confirmPlaceholder}

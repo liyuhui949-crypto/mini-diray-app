@@ -110,6 +110,35 @@
   }
 }
 
+.passwordField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordInput {
+  padding-right: 40px;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-text-tertiary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+
+  &:hover {
+    background: var(--md-bg-sunken);
+    color: var(--md-text-primary);
+  }
+}
+
 .field {
   margin-bottom: 14px;
 }

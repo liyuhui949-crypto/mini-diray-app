@@ -11,9 +11,38 @@ import { MarkdownPreview } from '@/features/editor/MarkdownPreview'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
 import { TagEditor } from '@/features/editor/TagEditor'
+import { PasswordInput } from '@/components/ui'
 
 afterEach(() => {
   cleanup()
+})
+
+describe('PasswordInput', () => {
+  it('默认隐藏，点眼睛可以查看与再次隐藏', async () => {
+    const user = userEvent.setup()
+    render(<PasswordInput defaultValue="secret-1234" aria-label="密码" />)
+    const input = screen.getByLabelText('密码') as HTMLInputElement
+    expect(input.type).toBe('password')
+
+    await user.click(screen.getByRole('button', { name: '显示密码' }))
+    expect(input.type).toBe('text')
+    expect(input.value).toBe('secret-1234')
+
+    await user.click(screen.getByRole('button', { name: '隐藏密码' }))
+    expect(input.type).toBe('password')
+  })
+
+  it('切换按钮不会提交所在表单', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault())
+    render(
+      <form onSubmit={onSubmit}>
+        <PasswordInput defaultValue="x" aria-label="密码" />
+      </form>
+    )
+    await user.click(screen.getByRole('button', { name: '显示密码' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
 })
 
 const entries: DiaryEntry[] = [
