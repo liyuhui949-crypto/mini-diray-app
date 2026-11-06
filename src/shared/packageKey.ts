@@ -16,9 +16,6 @@ export const PACKAGE_KEY_ALPHABET = `${UPPER}${LOWER}${DIGITS}`
 
 /** 当前生成的公钥长度（字符数，约 743 bit 熵） */
 export const PACKAGE_KEY_LENGTH = 128
-/** 早期版本生成过的 32 位公钥，仍然允许导入，避免旧包打不开 */
-export const LEGACY_PACKAGE_KEY_LENGTH = 32
-const ACCEPTED_LENGTHS = [PACKAGE_KEY_LENGTH, LEGACY_PACKAGE_KEY_LENGTH]
 const GROUP_SIZE = 4
 
 /** 128 个字符，从 56 个符号里均匀抽取（拒绝采样） */
@@ -45,7 +42,7 @@ export function normalizePackageKey(input: string): string {
 
 export function isValidPackageKey(input: string): boolean {
   const normalized = normalizePackageKey(input)
-  if (!ACCEPTED_LENGTHS.includes(normalized.length)) return false
+  if (normalized.length !== PACKAGE_KEY_LENGTH) return false
   for (const char of normalized) {
     if (!PACKAGE_KEY_ALPHABET.includes(char)) return false
   }

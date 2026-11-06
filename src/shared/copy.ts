@@ -345,7 +345,6 @@ export const copy = {
     packageKeyHint:
       '导出时生成的那串字符（128 位，区分大小写），可以带或不带短横线，建议整段粘贴。',
     packageKeyInvalid: '公钥格式不正确（应为 128 位字母数字）',
-    legacyPackageHint: '这是旧格式迁移包，只需要私钥（包密码）。',
     inspectRequiresKey: '这个包需要公钥才能打开。',
     exportPreparing: '准备中…',
     exportWriting: '写入',
@@ -453,6 +452,7 @@ export const copy = {
     notEnoughSpace: '磁盘空间不足',
     updateUnavailable: '更新服务不可用',
     packageKeyRequired: '这个迁移包需要公钥',
+    packageVersionUnsupported: '这个迁移包来自旧版本，已不再支持导入',
     wrongPackageKey: '公钥或私钥不正确',
     unknown: '出了点问题，请重试'
   },

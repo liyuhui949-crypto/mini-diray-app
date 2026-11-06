@@ -338,8 +338,6 @@ export function registerIpcHandlers(context: AppContext): void {
     }
   })
 
-  register('migration:inspect', async ({ filePath }) => context.migrationImport.inspect(filePath))
-
   register('migration:preview', async ({ filePath, packagePassword, packageKey }) =>
     context.migrationImport.preview(filePath, packagePassword, packageKey)
   )

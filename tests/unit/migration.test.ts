@@ -198,10 +198,6 @@ describe('迁移包 roundtrip', () => {
         scrypt: FAST
       })
 
-      const info = await importer.inspect(packagePath)
-      expect(info.requiresKey).toBe(true)
-      expect(info.packageFormat).toBe(2)
-
       await expect(importer.preview(packagePath, PACKAGE_PASSWORD)).rejects.toMatchObject({
         code: 'PACKAGE_KEY_REQUIRED'
       })
@@ -209,39 +205,6 @@ describe('迁移包 roundtrip', () => {
         importer.preview(packagePath, PACKAGE_PASSWORD, 'Z'.repeat(128))
       ).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
       await expect(importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)).resolves.toBeTruthy()
-    } finally {
-      await rm(source.dir, { recursive: true, force: true })
-      await rm(pkgDir, { recursive: true, force: true })
-      await rm(targetDir, { recursive: true, force: true })
-    }
-  })
-
-  it('旧格式（packageFormat 1）仍然只需要密码', async () => {
-    const source = await makeSource()
-    const pkgDir = await tempDir('minidiary-pkg-')
-    const targetDir = await tempDir('minidiary-dst-')
-    try {
-      const packagePath = path.join(pkgDir, 'legacy.minidiary')
-      await exportMigrationPackage(
-        { repository: source.repo, store: source.store, appVersion: '4.0.0', scrypt: FAST },
-        {
-          targetPath: packagePath,
-          packagePassword: PACKAGE_PASSWORD,
-          packageKey: '',
-          packageFormat: 1,
-          preferences: preferences(source.dir),
-          job: job()
-        }
-      )
-      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
-      const importer = new MigrationImporter({
-        repository: repo,
-        store: new AttachmentStore(targetDir, () => repo.getAttachmentKey()),
-        scrypt: FAST
-      })
-      expect((await importer.inspect(packagePath)).requiresKey).toBe(false)
-      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
-      expect(preview.summary.entryCount).toBe(1)
     } finally {
       await rm(source.dir, { recursive: true, force: true })
       await rm(pkgDir, { recursive: true, force: true })

@@ -27,7 +27,6 @@ export function MigrationImportDialog({
   const [filePath, setFilePath] = useState<string>('')
   const [packagePassword, setPackagePassword] = useState('')
   const [packageKey, setPackageKey] = useState('')
-  const [requiresKey, setRequiresKey] = useState(false)
   const [mode, setMode] = useState<MigrationMode>('replace')
   const [summary, setSummary] = useState<MigrationSummary | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -46,7 +45,6 @@ export function MigrationImportDialog({
       setFilePath(pendingPackage ?? '')
       setPackagePassword('')
       setPackageKey('')
-      setRequiresKey(false)
       setMode('replace')
       setSummary(null)
       setToken(null)
@@ -66,23 +64,13 @@ export function MigrationImportDialog({
   const pickFile = async (): Promise<void> => {
     const picked = await call('dialog:openFile', { purpose: 'migration' })
     if (!picked.path) return
-    await prepareFile(picked.path)
-  }
-
-  const prepareFile = async (target: string): Promise<void> => {
+    setFilePath(picked.path)
     setError(null)
-    try {
-      const info = await call('migration:inspect', { filePath: target })
-      setFilePath(target)
-      setRequiresKey(info.requiresKey)
-      setStep('password')
-    } catch (err) {
-      setError(errorMessage(err))
-    }
+    setStep('password')
   }
 
   const preview = async (): Promise<void> => {
-    if (requiresKey && !isValidPackageKey(packageKey)) {
+    if (!isValidPackageKey(packageKey)) {
       setError(copy.migration.packageKeyInvalid)
       return
     }
@@ -92,7 +80,7 @@ export function MigrationImportDialog({
       const previewed = await call('migration:preview', {
         filePath,
         packagePassword,
-        ...(requiresKey ? { packageKey: normalizePackageKey(packageKey) } : {})
+        packageKey: normalizePackageKey(packageKey)
       })
       setSummary(previewed.summary)
       setToken(previewed.token)
@@ -173,7 +161,7 @@ export function MigrationImportDialog({
             <Button onClick={onClose}>{copy.common.cancel}</Button>
             <Button
               variant="primary"
-              onClick={() => (filePath ? void prepareFile(filePath) : void pickFile())}
+              onClick={() => void pickFile()}
             >
               {copy.migration.importPick}
             </Button>
@@ -185,28 +173,24 @@ export function MigrationImportDialog({
 
       {step === 'password' ? (
         <>
-          {requiresKey ? (
-            <Field
-              label={copy.migration.packageKeyLabel}
-              hint={copy.migration.packageKeyHint}
-              htmlFor="import-package-key"
-            >
-              <Input
-                id="import-package-key"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={copy.migration.packageKeyPlaceholder}
-                className={styles.keyInput}
-                value={packageKey}
-                onChange={(event) => setPackageKey(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && packagePassword) void preview()
-                }}
-              />
-            </Field>
-          ) : (
-            <p className={styles.hint}>{copy.migration.legacyPackageHint}</p>
-          )}
+          <Field
+            label={copy.migration.packageKeyLabel}
+            hint={copy.migration.packageKeyHint}
+            htmlFor="import-package-key"
+          >
+            <Input
+              id="import-package-key"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={copy.migration.packageKeyPlaceholder}
+              className={styles.keyInput}
+              value={packageKey}
+              onChange={(event) => setPackageKey(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && packagePassword) void preview()
+              }}
+            />
+          </Field>
 
           <Field label={copy.migration.importPasswordLabel} htmlFor="import-password">
             <PasswordInput

@@ -6,7 +6,6 @@ import { Transform } from 'node:stream'
 import { AppError } from '@shared/errors'
 import type {
   DiaryEntry,
-  MigrationPackageInfo,
   MigrationSummary,
   PortablePreferences,
   VaultData
@@ -31,7 +30,6 @@ import {
   parseChecksums,
   parseManifest,
   parsePortablePrefs,
-  requiresPackageKey,
   type PackageManifest
 } from './package'
 import {
@@ -117,30 +115,6 @@ export class MigrationImporter {
 
   constructor(private readonly deps: MigrationImportDeps) {}
 
-  /** 只读清单，用来判断是否需要公钥（不校验内容、不写库） */
-  async inspect(filePath: string): Promise<MigrationPackageInfo> {
-    const archive = await ZipArchive.open(filePath, { allowMember: isAllowedPackageMember })
-    try {
-      if (!archive.has(PACKAGE_MEMBER.manifest)) {
-        throw new AppError('INVALID_INPUT', '迁移包缺少清单文件')
-      }
-      const manifestText = (
-        await archive.readBuffer(PACKAGE_MEMBER.manifest, 4 * 1024 * 1024)
-      ).toString('utf8')
-      const manifest = parseManifest(manifestText)
-      return {
-        packageFormat: manifest.packageFormat,
-        requiresKey: requiresPackageKey(manifest),
-        appVersion: manifest.appVersion,
-        createdAt: manifest.createdAt,
-        entryCount: manifest.entryCount,
-        attachmentCount: manifest.attachmentCount
-      }
-    } finally {
-      archive.close()
-    }
-  }
-
   async preview(
     filePath: string,
     packagePassword: string,
@@ -180,21 +154,16 @@ export class MigrationImporter {
       }
 
       const envelope = parseEnvelope(vaultBuffer.toString('utf8'))
-      const needsKey = requiresPackageKey(manifest)
-      if (needsKey) {
-        if (!packageKey || !isValidPackageKey(packageKey)) {
-          throw new AppError('PACKAGE_KEY_REQUIRED')
-        }
+      if (!packageKey || !isValidPackageKey(packageKey)) {
+        throw new AppError('PACKAGE_KEY_REQUIRED')
       }
-      const secret = needsKey
-        ? composePackageSecret(packageKey!, packagePassword)
-        : packagePassword
+      const secret = composePackageSecret(packageKey, packagePassword)
       let opened: Awaited<ReturnType<typeof openEnvelope>>
       try {
         opened = await openEnvelope(envelope, secret)
       } catch (error) {
         // 公钥或密码任一错误都会落到这里；统一提示，避免泄露是哪一半错了
-        throw new AppError('WRONG_PASSWORD', needsKey ? '公钥或私钥不正确' : undefined)
+        throw new AppError('WRONG_PASSWORD', '公钥或私钥不正确')
       }
 
       const attachments: PackageAttachmentMeta[] = []

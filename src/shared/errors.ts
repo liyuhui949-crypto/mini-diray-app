@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'UNSUPPORTED'
   | 'UPDATE_UNAVAILABLE'
   | 'PACKAGE_KEY_REQUIRED'
+  | 'PACKAGE_VERSION_UNSUPPORTED'
   | 'UNKNOWN'
 
 const defaultMessages: Record<ErrorCode, string> = {
@@ -36,6 +37,7 @@ const defaultMessages: Record<ErrorCode, string> = {
   UNSUPPORTED: '不支持的操作',
   UPDATE_UNAVAILABLE: copy.errors.updateUnavailable,
   PACKAGE_KEY_REQUIRED: copy.errors.packageKeyRequired,
+  PACKAGE_VERSION_UNSUPPORTED: copy.errors.packageVersionUnsupported,
   UNKNOWN: copy.errors.unknown
 }
 

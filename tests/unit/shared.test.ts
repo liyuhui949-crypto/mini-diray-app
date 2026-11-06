@@ -14,7 +14,6 @@ import {
 import { escapeHtml, renderMarkdownToHtml } from '@shared/markdown'
 import { isValidLocalDate, normalizeTags, passwordSchema, preferencesSchema } from '@shared/schemas'
 import {
-  LEGACY_PACKAGE_KEY_LENGTH,
   PACKAGE_KEY_ALPHABET,
   PACKAGE_KEY_LENGTH,
   composePackageSecret,
@@ -364,12 +363,6 @@ describe('迁移包公钥', () => {
     expect(isValidPackageKey(`${'A'.repeat(127)}O`)).toBe(false)
     expect(isValidPackageKey(`${'A'.repeat(127)}I`)).toBe(false)
     expect(isValidPackageKey(`${'A'.repeat(127)}l`)).toBe(false)
-  })
-
-  it('仍然接受早期 32 位公钥，保证旧包能导入', () => {
-    const legacy = '2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23'
-    expect(LEGACY_PACKAGE_KEY_LENGTH).toBe(32)
-    expect(isValidPackageKey(legacy)).toBe(true)
   })
 
   it('公钥与私钥组合后才是真正参与派生的口令，大小写不同即不同', () => {

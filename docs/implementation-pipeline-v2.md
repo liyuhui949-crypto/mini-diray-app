@@ -1630,7 +1630,14 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 迁移包导出/导入的私钥输入（公钥仍是明文，本就设计为可复制）；
 - 切换按钮 `type="button"`，不会误提交表单。
 
-### 15.9 已修复问题
+### 15.9 移除旧版迁移包兼容
+
+- 只接受 `packageFormat = 2`；`packageFormat = 1`（只靠密码、无需公钥）会直接报「来自旧版本，已不再支持导入」；
+- 公钥长度只接受 128 位，早期 32 位公钥不再放行；
+- 删除 `migration:inspect` IPC（它只用于判断"是否需要公钥"），导入界面固定显示公钥输入框；
+- 想迁移旧数据：先用旧版本导出 JSON，再用「导入 Mini Diary JSON」。
+
+### 15.10 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|

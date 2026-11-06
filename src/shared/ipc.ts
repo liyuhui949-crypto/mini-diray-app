@@ -13,7 +13,6 @@ import type {
   JobProgress,
   MenuCommand,
   MigrationMode,
-  MigrationPackageInfo,
   MigrationSummary,
   Preferences,
   StorageStats,
@@ -115,10 +114,6 @@ export interface IpcContract {
     req: { packagePassword: string; packageKey: string }
     res: { path: string | null; summary: MigrationSummary | null }
   }
-  'migration:inspect': {
-    req: { filePath: string }
-    res: MigrationPackageInfo
-  }
   'migration:preview': {
     req: { filePath: string; packagePassword: string; packageKey?: string }
     res: { token: string; summary: MigrationSummary }
@@ -207,8 +202,6 @@ export const requestValidators: RequestValidators = {
     z
       .object({ packagePassword: passwordSchema, packageKey: z.string().min(20).max(200) })
       .parse(payload) as IpcContract['migration:export']['req'],
-  'migration:inspect': (payload) =>
-    z.object({ filePath: optionalString }).parse(payload) as IpcContract['migration:inspect']['req'],
   'migration:preview': (payload) =>
     z
       .object({

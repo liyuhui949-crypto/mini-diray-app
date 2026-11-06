@@ -141,7 +141,7 @@ describe('迁移包清单与校验文件', () => {
 
   it('拒绝缺少字段或版本过新的清单', () => {
     const manifest = {
-      packageFormat: 1,
+      packageFormat: 2,
       appVersion: '4.0.0',
       createdAt: '2026-11-06T00:00:00.000Z',
       formatVersion: 1,
@@ -155,8 +155,10 @@ describe('迁移包清单与校验文件', () => {
       hasPreferences: true
     }
     expect(parseManifest(JSON.stringify(manifest)).entryCount).toBe(1)
-    // 旧格式（1）仍然可以读，用来导入历史包
-    expect(parseManifest(JSON.stringify({ ...manifest, packageFormat: 1 })).packageFormat).toBe(1)
+    // 旧格式（1）不再支持
+    expect(() => parseManifest(JSON.stringify({ ...manifest, packageFormat: 1 }))).toThrow(
+      /旧版本/
+    )
     expect(() => parseManifest(JSON.stringify({ ...manifest, packageFormat: 99 }))).toThrow(
       /更新的版本/
     )
