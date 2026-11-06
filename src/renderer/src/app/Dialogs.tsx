@@ -4,7 +4,6 @@ import { MigrationImportDialog } from '@/features/migration/MigrationImportDialo
 import {
   ChangePasswordDialog,
   CleanupDialog,
-  DeleteVaultDialog,
   ResetVaultDialog
 } from '@/features/preferences/AccountDialogs'
 import { useUiStore } from '@/stores/ui'
@@ -17,7 +16,6 @@ export function Dialogs(): React.JSX.Element {
     <>
       <ChangePasswordDialog open={dialog === 'changePassword'} onClose={close} />
       <ResetVaultDialog open={dialog === 'resetVault'} onClose={close} />
-      <DeleteVaultDialog open={dialog === 'deleteVault'} onClose={close} />
       <CleanupDialog open={dialog === 'cleanup'} onClose={close} />
       <MigrationExportDialog open={dialog === 'migrationExport'} onClose={close} />
       <MigrationImportDialog open={dialog === 'migrationImport'} onClose={close} />

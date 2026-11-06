@@ -172,10 +172,6 @@ export function registerIpcHandlers(context: AppContext): void {
     return snapshot
   })
 
-  register('vault:delete', async ({ password }) => {
-    await repository.deleteVault(password)
-  })
-
   // ───────────────────────── entries ─────────────────────────
   register('entry:save', async ({ entry }) => repository.saveEntry(entry))
   register('entry:delete', async ({ date }) => repository.deleteEntry(date))

@@ -194,31 +194,6 @@ describe('VaultRepository', () => {
     }
   })
 
-  it('删除日记库会移除整个目录', async () => {
-    const dir = await tempDir()
-    try {
-      const repo = new VaultRepository({ dir, scrypt: FAST })
-      await repo.create(PASSWORD)
-      await repo.deleteVault(PASSWORD)
-      expect(await repo.statusOnDisk()).toBe('missing')
-      expect(await stat(dir).catch(() => null)).toBeNull()
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('拒绝用错误密码删除', async () => {
-    const dir = await tempDir()
-    try {
-      const repo = new VaultRepository({ dir, scrypt: FAST })
-      await repo.create(PASSWORD)
-      await expect(repo.deleteVault('nope')).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
-      expect(await repo.statusOnDisk()).toBe('unlocked')
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
   it('findAttachment 只在当前库内查找', async () => {
     const dir = await tempDir()
     try {

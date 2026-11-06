@@ -408,16 +408,6 @@ export class VaultRepository {
     return this.getSnapshot()
   }
 
-  /** 删除整个日记库目录，回到引导页 */
-  async deleteVault(password: string): Promise<void> {
-    await this.verifyPassword(password)
-    const dir = this.dir
-    await this.flush()
-    this.lock()
-    await removePath(dir)
-    logger.warn('vault deleted')
-  }
-
   /** 整目录搬迁（vault + attachments）；失败回滚 */
   async moveDirectory(targetDir: string): Promise<{ diaryDir: string }> {
     const target = path.resolve(targetDir)

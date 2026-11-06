@@ -7,7 +7,6 @@ import { call, errorMessage } from '@/api/client'
 import { Button, Dialog, Field, Input, uiStyles } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
-import { useVaultStore } from '@/stores/vault'
 
 export function ChangePasswordDialog({
   open,
@@ -179,85 +178,6 @@ export function ResetVaultDialog({
           id="reset-keyword"
           value={state.keyword}
           placeholder={copy.reset.keyword}
-          onChange={(event) => setState({ ...state, keyword: event.target.value })}
-        />
-      </Field>
-      {error ? <p className={uiStyles.error}>{error}</p> : null}
-    </Dialog>
-  )
-}
-
-export function DeleteVaultDialog({
-  open,
-  onClose
-}: {
-  open: boolean
-  onClose: () => void
-}): React.JSX.Element {
-  const [state, setState] = useState<ConfirmState>({ password: '', keyword: '' })
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const pushToast = useUiStore((state) => state.pushToast)
-
-  useEffect(() => {
-    if (!open) {
-      setState({ password: '', keyword: '' })
-      setError(null)
-      setBusy(false)
-    }
-  }, [open])
-
-  const submit = async (): Promise<void> => {
-    if (state.keyword.trim() !== copy.removeVault.keyword) {
-      setError(`请输入「${copy.removeVault.keyword}」`)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      await call('vault:delete', { password: state.password })
-      useEntriesStore.getState().clear()
-      useVaultStore.getState().setStatus('missing')
-      pushToast(copy.removeVault.success)
-      onClose()
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(value) => {
-        if (!value) onClose()
-      }}
-      title={copy.removeVault.title}
-      description={`${copy.removeVault.subtitle}\n${copy.removeVault.warning}`}
-      footer={
-        <>
-          <Button onClick={onClose}>{copy.common.cancel}</Button>
-          <Button variant="danger" disabled={busy} onClick={() => void submit()}>
-            {busy ? copy.common.loading : copy.removeVault.submit}
-          </Button>
-        </>
-      }
-    >
-      <Field label="日记密码" htmlFor="delete-password">
-        <Input
-          id="delete-password"
-          type="password"
-          autoComplete="current-password"
-          value={state.password}
-          onChange={(event) => setState({ ...state, password: event.target.value })}
-        />
-      </Field>
-      <Field label={copy.removeVault.keywordLabel} htmlFor="delete-keyword">
-        <Input
-          id="delete-keyword"
-          value={state.keyword}
-          placeholder={copy.removeVault.keyword}
           onChange={(event) => setState({ ...state, keyword: event.target.value })}
         />
       </Field>

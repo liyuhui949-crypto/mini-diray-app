@@ -282,12 +282,9 @@ export const copy = {
     cleanupDesc: '删除没有被任何日记引用的附件，释放空间',
     cleanupAction: '清理…',
     dangerZone: '危险操作',
-    resetDiary: '重置日记',
-    resetDiaryDesc: '清空全部条目，保留密码与目录',
-    resetAction: '重置',
-    deleteDiary: '删除日记',
-    deleteDiaryDesc: '删除整个日记目录，无法撤销',
-    deleteAction: '删除',
+    resetDiary: '清空全部日记',
+    resetDiaryDesc: '删除所有日记与加密附件，保留密码与目录，不可恢复',
+    resetAction: '清空…',
     about: '关于',
     version: '版本',
     encryption: '加密',
@@ -312,23 +309,13 @@ export const copy = {
   },
 
   reset: {
-    title: '重置日记',
-    subtitle: '这会清空全部条目与附件，密码和目录保留。',
-    warning: '不可恢复。建议先导出一份迁移包。',
-    keywordLabel: '请输入「确认重置」以继续',
-    keyword: '确认重置',
+    title: '清空全部日记',
+    subtitle: '这会删除所有日记与加密附件，密码和日记目录保留，应用仍可继续使用。',
+    warning: '不可恢复，也没有回收站。建议先导出一份迁移包。',
+    keywordLabel: '请输入「清空日记」以继续',
+    keyword: '清空日记',
     submit: '清空全部内容',
-    success: '日记已重置'
-  },
-
-  removeVault: {
-    title: '删除日记',
-    subtitle: '这会删除整个日记目录（含加密附件），应用回到引导页。',
-    warning: '不可恢复。如果可能还需要这些内容，请先导出迁移包。',
-    keywordLabel: '请输入「删除日记」以继续',
-    keyword: '删除日记',
-    submit: '永久删除',
-    success: '日记已删除'
+    success: '日记与附件已清空'
   },
 
   migration: {

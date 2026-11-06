@@ -79,7 +79,6 @@ export interface IpcContract {
   'vault:changePassword': { req: { currentPassword: string; newPassword: string }; res: void }
   'vault:moveDirectory': { req: { targetDir: string }; res: { diaryDir: string } }
   'vault:reset': { req: { password: string }; res: VaultSnapshot }
-  'vault:delete': { req: { password: string }; res: void }
 
   'entry:save': {
     req: { entry: EntryDraft }
@@ -166,8 +165,6 @@ export const requestValidators: RequestValidators = {
     z.object({ targetDir: optionalString }).parse(payload) as IpcContract['vault:moveDirectory']['req'],
   'vault:reset': (payload) =>
     z.object({ password: z.string().min(1).max(200) }).parse(payload) as IpcContract['vault:reset']['req'],
-  'vault:delete': (payload) =>
-    z.object({ password: z.string().min(1).max(200) }).parse(payload) as IpcContract['vault:delete']['req'],
   'entry:save': (payload) =>
     z.object({ entry: entryDraftSchema }).parse(payload) as IpcContract['entry:save']['req'],
   'entry:delete': (payload) =>

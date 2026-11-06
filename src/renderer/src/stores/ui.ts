@@ -10,7 +10,6 @@ export type ListScope = 'month' | 'all'
 export type DialogName =
   | 'changePassword'
   | 'resetVault'
-  | 'deleteVault'
   | 'migrationExport'
   | 'migrationImport'
   | 'import'

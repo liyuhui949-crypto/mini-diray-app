@@ -1599,7 +1599,16 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 | 拼写检查开关 | 删除偏好、session 配置与编辑器开关；`spellcheck` 固定关闭 |
 | 旧版 Mini Diary 导入 | 删除 `vault/legacy.ts`、`legacy:*` IPC、设置入口与对话框；旧数据改走「导入 Mini Diary JSON」 |
 
-### 15.5 已修复问题
+### 15.5 合并「重置日记」与「删除日记」（ADR 0003）
+
+两者都会清空内容且不可恢复，产品负责人确认只保留一个：**清空全部日记**。
+
+- 行为：删除所有条目与 `attachments/` 下的加密附件，保留密码与日记目录，应用仍可继续使用；
+- 需要密码 + 确认短语「清空日记」，执行前保留临时回滚点，成功后清理；
+- 删除整个库并回到引导页的能力（`vault:delete`、`repository.deleteVault`、设置页「删除日记」、`DeleteVaultDialog`）已移除；
+  想彻底清空也可以直接删除日记目录（目录路径在设置里可见）。
+
+### 15.6 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|

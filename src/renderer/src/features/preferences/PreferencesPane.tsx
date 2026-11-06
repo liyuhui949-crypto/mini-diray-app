@@ -164,11 +164,6 @@ export function PreferencesPane(): React.JSX.Element {
             {copy.preferences.resetAction}
           </Button>
         </Setting>
-        <Setting title={copy.preferences.deleteDiary} description={copy.preferences.deleteDiaryDesc}>
-          <Button size="sm" variant="danger" onClick={() => openDialog('deleteVault')}>
-            {copy.preferences.deleteAction}
-          </Button>
-        </Setting>
       </section>
 
       <section className={styles.panel}>
