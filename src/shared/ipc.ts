@@ -124,7 +124,7 @@ export interface IpcContract {
     res: { token: string; summary: MigrationSummary }
   }
   'migration:import': {
-    req: { token: string; mode: MigrationMode; newPassword: string }
+    req: { token: string; mode: MigrationMode }
     res: { revision: number; entries: number; attachments: number; merged: number }
   }
   'migration:cancel': { req: { jobId: string }; res: void }
@@ -219,7 +219,7 @@ export const requestValidators: RequestValidators = {
       .parse(payload) as IpcContract['migration:preview']['req'],
   'migration:import': (payload) =>
     z
-      .object({ token: z.string().min(1), mode: migrationModeSchema, newPassword: passwordSchema })
+      .object({ token: z.string().min(1), mode: migrationModeSchema })
       .parse(payload) as IpcContract['migration:import']['req'],
   'migration:cancel': (payload) =>
     z.object({ jobId: z.string().min(1).max(64) }).parse(payload) as IpcContract['migration:cancel']['req'],

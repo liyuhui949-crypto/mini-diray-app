@@ -5,7 +5,6 @@ import { Transform } from 'node:stream'
 
 import { AppError } from '@shared/errors'
 import type {
-  Attachment,
   DiaryEntry,
   MigrationPackageInfo,
   MigrationSummary,
@@ -21,6 +20,7 @@ import { AttachmentStore } from '../attachments/store'
 import { decryptMdatStream } from '../attachments/stream'
 import { ZipArchive } from '../core/zip'
 import { deriveAttachmentKey, randomUuid, type ScryptParams } from '../vault/crypto'
+import { pathExists, removePath, vaultPaths } from '../vault/paths'
 import { composePackageSecret, isValidPackageKey } from '@shared/packageKey'
 import { openEnvelope, parseEnvelope, rewrapEnvelope, sealPayload, type VaultEnvelope } from '../vault/format'
 import type { VaultRepository } from '../vault/repository'
@@ -39,8 +39,7 @@ import {
   createStagingDir,
   finalizeSwitch,
   restoreFromRollback,
-  switchStagingIntoPlace,
-  type StagingPaths
+  switchStagingIntoPlace
 } from './staging'
 
 export interface PackageAttachmentMeta {
@@ -57,6 +56,8 @@ interface TokenRecord {
   manifest: PackageManifest
   envelope: VaultEnvelope
   data: VaultData
+  /** 用户输入的私钥（包密码）；只在导入内存里短暂保留，用完即清 */
+  packagePassword: string
   packageDek: Buffer
   packageAttachmentKey: Buffer
   prefs: PortablePreferences | null
@@ -75,7 +76,6 @@ export interface MigrationImportDeps {
 export interface MigrateOptions {
   token: string
   mode: 'replace' | 'merge'
-  newPassword: string
   job: JobHandle
 }
 
@@ -236,6 +236,7 @@ export class MigrationImporter {
         manifest,
         envelope,
         data: opened.data,
+        packagePassword,
         packageDek: opened.dek,
         packageAttachmentKey: deriveAttachmentKey(opened.dek, envelope.vaultId),
         prefs,
@@ -256,70 +257,68 @@ export class MigrationImporter {
     const record = this.tokens.get(token)
     if (!record) return
     this.tokens.delete(token)
+    record.packagePassword = ''
     record.packageDek.fill(0)
     record.packageAttachmentKey.fill(0)
   }
 
+  /**
+   * 执行导入。**不需要用户设置新密码**：
+   * - 目标库已解锁（merge / replace 到现有库）：保留目标密钥与密码，原地写入；
+   * - 没有库或库被锁定（replace）：整套切换并采用包内 DEK，之后用迁移包的私钥解锁。
+   */
   async run(options: MigrateOptions): Promise<MigrateResult> {
     const record = this.tokens.get(options.token)
     if (!record) throw new AppError('NOT_FOUND', '导入会话已过期，请重新选择迁移包')
     this.tokens.delete(options.token)
 
-    const { repository, store } = this.deps
+    const { repository } = this.deps
     const job = options.job
     const canKeepTargetKey = repository.isUnlocked
     if (options.mode === 'merge' && !canKeepTargetKey) {
       throw new AppError('VAULT_LOCKED', '合并导入需要先解锁当前日记库')
     }
 
-    // 无库、或锁定状态下整体替换：直接采用包内 DEK，附件密文原样复制（最快路径）
     const adoptPackageKey = !canKeepTargetKey
+    const unlockPassword = adoptPackageKey ? record.packagePassword : null
     const targetKey = adoptPackageKey ? record.packageAttachmentKey : repository.getAttachmentKey()
-    void store
-    const staging: StagingPaths = await createStagingDir(repository.vaultDir, job.id)
+    const staging = await createStagingDir(repository.vaultDir, job.id)
     const stagingStore = new AttachmentStore(staging.root, () => targetKey)
 
     let switched = false
     let rollbackDir: string | null = null
+    let previousData: VaultData | null = null
+    let attachmentsSwapped = false
+    const movedIn: string[] = []
 
     try {
       const archive = await ZipArchive.open(record.filePath, { allowMember: isAllowedPackageMember })
       try {
-        // 1. 计算新 ID 与条目
+        // 1. 条目与附件 ID 映射
         const idMap = new Map<string, string>()
         if (options.mode === 'merge') {
           for (const attachment of record.attachments) {
             idMap.set(attachment.id.toLowerCase(), randomUuid())
           }
         }
-
-        const incomingEntries: DiaryEntry[] = record.data.entries.map((entry) => {
-          const attachments: Attachment[] = entry.attachments.map((attachment) => {
+        const incomingEntries: DiaryEntry[] = record.data.entries.map((entry) => ({
+          ...entry,
+          attachments: entry.attachments.map((attachment) => {
             const nextId = idMap.get(attachment.id.toLowerCase())
             return nextId ? { ...attachment, id: nextId } : { ...attachment }
-          })
-          return {
-            ...entry,
-            attachments,
-            body: rewriteAttachmentIds(entry.body, idMap)
-          }
-        })
+          }),
+          body: rewriteAttachmentIds(entry.body, idMap)
+        }))
 
-        const targetVaultId = adoptPackageKey
-          ? record.envelope.vaultId
-          : repository.getVaultId()
-
-        let finalEntries: DiaryEntry[]
         let mergedCount = 0
+        let finalEntries = incomingEntries
         if (options.mode === 'merge') {
           const merged = mergeEntryLists(repository.getSnapshot().entries, incomingEntries)
           finalEntries = merged.entries
           mergedCount = merged.stats.merged
-        } else {
-          finalEntries = incomingEntries
         }
 
-        // 2. 附件：按需原样复制或重新加密
+        // 2. 附件写入 staging（整库接管时原样复制，否则用目标 DEK 重新加密）
         const totalBytes = record.attachments.reduce((sum, item) => sum + item.size, 0)
         let processed = 0
         for (const attachment of record.attachments) {
@@ -330,18 +329,20 @@ export class MigrationImporter {
 
           if (adoptPackageKey) {
             await stagingStore.importRawFile(targetId, hashed.stream)
-            if (attachment.cipherSha256) {
-              const digest = hashed.digest()
-              if (digest !== attachment.cipherSha256) {
-                throw new AppError('CORRUPT_VAULT', '迁移包附件校验失败')
-              }
+            if (attachment.cipherSha256 && hashed.digest() !== attachment.cipherSha256) {
+              throw new AppError('CORRUPT_VAULT', '迁移包附件校验失败')
             }
           } else {
-            const decrypted = decryptMdatStream(hashed.stream, record.packageAttachmentKey, {
-              size: attachment.size,
-              chunkSize: attachment.chunkSize,
-              totalChunks: attachment.totalChunks
-            }, { signal: job.signal })
+            const decrypted = decryptMdatStream(
+              hashed.stream,
+              record.packageAttachmentKey,
+              {
+                size: attachment.size,
+                chunkSize: attachment.chunkSize,
+                totalChunks: attachment.totalChunks
+              },
+              { signal: job.signal }
+            )
             const result = await stagingStore.encryptFromReadable({
               id: targetId,
               size: attachment.size,
@@ -356,11 +357,8 @@ export class MigrationImporter {
             if (known && known.sha256 !== result.sha256) {
               throw new AppError('CORRUPT_VAULT', '迁移包附件明文校验失败')
             }
-            if (attachment.cipherSha256) {
-              const digest = hashed.digest()
-              if (digest !== attachment.cipherSha256) {
-                throw new AppError('CORRUPT_VAULT', '迁移包附件校验失败')
-              }
+            if (attachment.cipherSha256 && hashed.digest() !== attachment.cipherSha256) {
+              throw new AppError('CORRUPT_VAULT', '迁移包附件校验失败')
             }
           }
 
@@ -371,50 +369,7 @@ export class MigrationImporter {
           })
         }
 
-        // 3. 生成 staging 的 diary.vault
-        job.report(0.9, '写入日记库…')
-        const now = new Date().toISOString()
-        const nextData: VaultData = {
-          schemaVersion: record.data.schemaVersion,
-          vaultId: targetVaultId,
-          createdAt: adoptPackageKey ? record.data.createdAt : now,
-          updatedAt: now,
-          entries: finalEntries
-        }
-
-        if (adoptPackageKey) {
-          // 附件密文原样复制，所以必须沿用包内 DEK：只换密码，不换密钥
-          const rewrapped = await rewrapEnvelope(
-            record.envelope,
-            record.packageDek,
-            options.newPassword,
-            this.deps.scrypt ?? undefined
-          )
-          const sealed = sealPayload(rewrapped, record.packageDek, nextData)
-          await fs.writeFile(staging.vaultFile, JSON.stringify(sealed), { mode: 0o600 })
-        } else {
-          const { envelope } = repository.getEnvelopeForExport()
-          const rewrapped = await rewrapEnvelope(
-            envelope,
-            repository.getDek(),
-            options.newPassword,
-            this.deps.scrypt ?? undefined
-          )
-          const sealed = sealPayload(rewrapped, repository.getDek(), nextData)
-          await fs.writeFile(staging.vaultFile, JSON.stringify(sealed), { mode: 0o600 })
-        }
-
-        // 4. 校验 staging：用新密码重新解开，并抽查附件文件尺寸
-        job.report(0.94, '校验导入结果…')
-        const stagingText = await fs.readFile(staging.vaultFile, 'utf8')
-        const verified = await openEnvelope(parseEnvelope(stagingText), options.newPassword)
-        if (verified.data.entries.length !== finalEntries.length) {
-          throw new AppError('IO_ERROR', '导入校验失败：条目数量不一致')
-        }
-        verified.dek.fill(0)
-
-        // staging 里应当正好是「包内每个附件按映射后的 ID」一份。
-        // 合并模式下，目标库原有的附件仍留在原目录，不能被算进 staging 校验。
+        // 3. staging 附件完整性（合并模式下目标库原有附件不在 staging 里，只查包内附件）
         for (const attachment of record.attachments) {
           const targetId = idMap.get(attachment.id.toLowerCase()) ?? attachment.id
           const stats = await fs
@@ -425,22 +380,83 @@ export class MigrationImporter {
           }
         }
 
-        // 5. 原子切换
-        job.report(0.97, '切换目录…')
-        repository.lock()
-        const result = await switchStagingIntoPlace(repository.vaultDir, staging, job.id, options.mode)
-        rollbackDir = result.rollbackDir
-        switched = true
+        const now = new Date().toISOString()
+        const nextData: VaultData = {
+          schemaVersion: record.data.schemaVersion,
+          vaultId: adoptPackageKey ? record.envelope.vaultId : repository.getVaultId(),
+          createdAt: adoptPackageKey ? record.data.createdAt : now,
+          updatedAt: now,
+          entries: finalEntries
+        }
 
-        try {
-          await repository.unlock(options.newPassword)
-        } catch (error) {
-          if (rollbackDir) await restoreFromRollback(repository.vaultDir, rollbackDir)
-          switched = false
-          throw error instanceof AppError ? error : new AppError('IO_ERROR', '导入后解锁失败，已回滚')
+        if (adoptPackageKey) {
+          // 4a. 没有库 / 库被锁定：写新 vault（用包的私钥包裹），整套切换
+          job.report(0.9, '写入日记库…')
+          const password = unlockPassword as string
+          const rewrapped = await rewrapEnvelope(
+            record.envelope,
+            record.packageDek,
+            password,
+            this.deps.scrypt ?? undefined
+          )
+          const sealed = sealPayload(rewrapped, record.packageDek, nextData)
+          await fs.writeFile(staging.vaultFile, JSON.stringify(sealed), { mode: 0o600 })
+
+          const verified = await openEnvelope(
+            parseEnvelope(await fs.readFile(staging.vaultFile, 'utf8')),
+            password
+          )
+          if (verified.data.entries.length !== finalEntries.length) {
+            throw new AppError('IO_ERROR', '导入校验失败：条目数量不一致')
+          }
+          verified.dek.fill(0)
+
+          job.report(0.97, '切换目录…')
+          repository.lock()
+          const result = await switchStagingIntoPlace(repository.vaultDir, staging, job.id)
+          rollbackDir = result.rollbackDir
+          switched = true
+
+          try {
+            await repository.unlock(password)
+          } catch (error) {
+            if (rollbackDir) await restoreFromRollback(repository.vaultDir, rollbackDir)
+            switched = false
+            throw error instanceof AppError
+              ? error
+              : new AppError('IO_ERROR', '导入后解锁失败，已回滚')
+          }
+        } else {
+          // 4b. 已解锁的库：保留密钥与密码，原地替换（不重包 DEK）
+          job.report(0.9, '写入日记库…')
+          previousData = structuredClone(repository.getEnvelopeForExport().data)
+          rollbackDir = await this.createInPlaceRollback(repository.vaultDir, job.id)
+          const target = vaultPaths(repository.vaultDir)
+
+          if (options.mode === 'replace') {
+            if (await pathExists(target.attachmentsDir)) {
+              await fs.rename(target.attachmentsDir, path.join(rollbackDir, 'attachments'))
+              attachmentsSwapped = true
+            }
+            await fs.rename(staging.attachmentsDir, target.attachmentsDir)
+          } else {
+            await fs.mkdir(target.attachmentsDir, { recursive: true, mode: 0o700 })
+            const files = await fs.readdir(staging.attachmentsDir).catch(() => [] as string[])
+            for (const file of files) {
+              await fs.rename(
+                path.join(staging.attachmentsDir, file),
+                path.join(target.attachmentsDir, file)
+              )
+              movedIn.push(file)
+            }
+          }
+
+          await repository.replaceAllWithCurrentKey(nextData)
+          switched = true
         }
 
         if (rollbackDir) await finalizeSwitch(rollbackDir)
+        rollbackDir = null
         await cleanupStaging(staging)
 
         job.done({ summary: { entries: finalEntries.length, attachments: record.attachments.length } })
@@ -462,8 +478,25 @@ export class MigrationImporter {
         archive.close()
       }
     } catch (error) {
-      if (switched && rollbackDir) {
+      if (adoptPackageKey && switched && rollbackDir) {
         await restoreFromRollback(repository.vaultDir, rollbackDir).catch(() => undefined)
+      }
+      if (!adoptPackageKey && rollbackDir) {
+        // 原地替换失败：撤掉搬进来的附件、恢复旧附件目录，再把旧数据写回去
+        const target = vaultPaths(repository.vaultDir)
+        for (const file of movedIn) {
+          await fs.rm(path.join(target.attachmentsDir, file), { force: true }).catch(() => undefined)
+        }
+        if (attachmentsSwapped) {
+          await fs.rm(target.attachmentsDir, { recursive: true, force: true }).catch(() => undefined)
+          await fs
+            .rename(path.join(rollbackDir, 'attachments'), target.attachmentsDir)
+            .catch(() => undefined)
+        }
+        if (previousData && repository.isUnlocked) {
+          await repository.replaceAllWithCurrentKey(previousData).catch(() => undefined)
+        }
+        await finalizeSwitch(rollbackDir).catch(() => undefined)
       }
       await cleanupStaging(staging).catch(() => undefined)
       if (error instanceof AppError) {
@@ -477,7 +510,17 @@ export class MigrationImporter {
     } finally {
       record.packageDek.fill(0)
       record.packageAttachmentKey.fill(0)
+      record.packagePassword = ''
     }
+  }
+
+  /** 原地导入前的回滚点：只复制体积很小的 vault 文件，附件目录靠 rename 保留 */
+  private async createInPlaceRollback(diaryDir: string, jobId: string): Promise<string> {
+    const dir = path.join(vaultPaths(diaryDir).migrationDir, `rollback-${jobId}`)
+    await removePath(dir).catch(() => undefined)
+    await fs.mkdir(dir, { recursive: true, mode: 0o700 })
+    await fs.copyFile(vaultPaths(diaryDir).vaultFile, path.join(dir, 'diary.vault'))
+    return dir
   }
 }
 

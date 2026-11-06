@@ -344,10 +344,10 @@ export function registerIpcHandlers(context: AppContext): void {
     context.migrationImport.preview(filePath, packagePassword, packageKey)
   )
 
-  register('migration:import', async ({ token, mode, newPassword }) => {
+  register('migration:import', async ({ token, mode }) => {
     const job = jobs.create('migration-import')
     try {
-      const result = await context.migrationImport.run({ token, mode, newPassword, job })
+      const result = await context.migrationImport.run({ token, mode, job })
       if (result.prefs) {
         const next = await preferences.update({
           theme: result.prefs.theme,

@@ -32,8 +32,6 @@ export function MigrationImportDialog({
   const [packageKey, setPackageKey] = useState('')
   const [requiresKey, setRequiresKey] = useState(false)
   const [mode, setMode] = useState<MigrationMode>('replace')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [summary, setSummary] = useState<MigrationSummary | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -54,8 +52,6 @@ export function MigrationImportDialog({
       setPackageKey('')
       setRequiresKey(false)
       setMode('replace')
-      setNewPassword('')
-      setConfirmPassword('')
       setSummary(null)
       setToken(null)
       setError(null)
@@ -113,18 +109,10 @@ export function MigrationImportDialog({
 
   const run = async (): Promise<void> => {
     if (!token) return
-    if (newPassword.length < 8) {
-      setError('新密码至少 8 位')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setError('两次输入的新密码不一致')
-      return
-    }
     setError(null)
     setStep('running')
     try {
-      const imported = await call('migration:import', { token, mode, newPassword })
+      const imported = await call('migration:import', { token, mode })
       const snapshot = await call('vault:snapshot', undefined)
       useVaultStore.getState().setSnapshot(snapshot)
       useEntriesStore.getState().loadSnapshot(snapshot)
@@ -289,27 +277,18 @@ export function MigrationImportDialog({
             />
           </Field>
           <p className={styles.hint}>
-            {mode === 'replace' ? copy.migration.importOverwrites : copy.migration.importModeMergeDesc}
+            {mode === 'replace'
+              ? vaultExists
+                ? copy.migration.importOverwrites
+                : copy.migration.importFreshHint
+              : copy.migration.importModeMergeDesc}
           </p>
 
-          <Field label={copy.migration.importNewPassword} hint={copy.migration.importNewPasswordHint} htmlFor="import-new">
-            <Input
-              id="import-new"
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-            />
-          </Field>
-          <Field label="确认新密码" htmlFor="import-new-confirm">
-            <Input
-              id="import-new-confirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-            />
-          </Field>
+          <p className={styles.hint}>
+            {status === 'unlocked'
+              ? copy.migration.keepPasswordHint
+              : copy.migration.packagePasswordUnlockHint}
+          </p>
           {error ? <p className={uiStyles.error}>{error}</p> : null}
         </div>
       ) : null}

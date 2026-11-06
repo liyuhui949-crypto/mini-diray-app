@@ -475,8 +475,11 @@ export class VaultRepository {
     this.revision += 1
   }
 
-  /** 迁移导入 replace（保留目标 DEK）时使用：整库替换后重新用新密码包裹 DEK */
-  async replaceAllWithCurrentKey(data: VaultData, newPassword: string): Promise<void> {
+  /**
+   * 整库替换但保留当前密钥与密码（导入 replace / merge 使用）：
+   * 只重新加密 payload，keyWrap 原样复用，所以用户不需要重新设置密码。
+   */
+  async replaceAllWithCurrentKey(data: VaultData): Promise<void> {
     this.assertUnlocked()
     if (!this.envelope || !this.dek) throw new AppError('VAULT_LOCKED')
     const now = this.clock().toISOString()
@@ -486,13 +489,7 @@ export class VaultRepository {
       vaultId: this.envelope.vaultId,
       updatedAt: now
     }
-    const rewrapped = await rewrapEnvelope(
-      this.envelope,
-      this.dek,
-      newPassword,
-      this.scrypt ?? undefined
-    )
-    const sealed = sealPayload(rewrapped, this.dek, next)
+    const sealed = sealPayload(this.envelope, this.dek, next)
     await ensureVaultDirs(this.paths)
     await atomicWriteFile(this.paths.vaultFile, serializeEnvelope(sealed))
     this.envelope = sealed

@@ -18,7 +18,6 @@ const PASSWORD = 'source-password-1234'
 const PACKAGE_PASSWORD = 'package-password-1234'
 /** 32 位、只含公钥字母表字符 */
 const PACKAGE_KEY = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ23-4567-89AB'
-const NEW_PASSWORD = 'imported-password-1234'
 
 const PNG = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
@@ -151,12 +150,12 @@ describe('迁移包 roundtrip', () => {
       const result = await importer.run({
         token: preview.token,
         mode: 'replace',
-        newPassword: NEW_PASSWORD,
         job: job('migration-import')
       })
       expect(result.entries).toBe(1)
 
-      const snapshot = await repo.unlock(NEW_PASSWORD)
+      // 不需要新密码：没有库时导入后的解锁密码就是迁移包的私钥
+      const snapshot = await repo.unlock(PACKAGE_PASSWORD)
       expect(snapshot.entries).toHaveLength(1)
       const entry = snapshot.entries[0]
       expect(entry?.title).toBe('雨停之后')
@@ -323,7 +322,6 @@ describe('迁移包 roundtrip', () => {
       await importer.run({
         token: preview.token,
         mode: 'replace',
-        newPassword: NEW_PASSWORD,
         job: job('migration-import')
       })
 
@@ -378,7 +376,6 @@ describe('迁移包 roundtrip', () => {
       const result = await importer.run({
         token: preview.token,
         mode: 'merge',
-        newPassword: PASSWORD,
         job: job('migration-import')
       })
       expect(result.merged).toBe(1)
@@ -432,7 +429,6 @@ describe('迁移包 roundtrip', () => {
       const result = await importer.run({
         token: preview.token,
         mode: 'merge',
-        newPassword: PASSWORD,
         job: job('migration-import')
       })
       expect(result.merged).toBe(1)
@@ -451,10 +447,11 @@ describe('迁移包 roundtrip', () => {
         expect.arrayContaining([`${own.id}.mdat`, `${imported!.id}.mdat`])
       )
 
-      // 回滚目录已清理，库仍可正常解锁
+      // 不需要重新设置密码：仍是原来的日记密码
+      expect(repo.isUnlocked).toBe(true)
       expect(await stat(path.join(targetDir, 'migration')).then((info) => info.isDirectory())).toBe(true)
       repo.lock()
-      await repo.unlock(PASSWORD)
+      await repo.unlock('target-password-1234')
     } finally {
       await rm(source.dir, { recursive: true, force: true })
       await rm(pkgDir, { recursive: true, force: true })
@@ -515,7 +512,6 @@ describe('迁移包 roundtrip', () => {
       await importer.run({
         token: preview.token,
         mode: 'replace',
-        newPassword: NEW_PASSWORD,
         job: job('migration-import')
       })
       expect(await store.listFiles()).toContain(`${orphan.id}.mdat`)

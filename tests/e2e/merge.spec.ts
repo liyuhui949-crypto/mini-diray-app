@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 
-import { createVault, fillInput, launchApp, makeHome } from './helpers'
+import { createVault, fillInput, launchApp, makeHome, unlockVault } from './helpers'
 
 /**
  * 合并导入的回归用例：目标库已经有「自己的条目 + 自己的附件」，
@@ -12,7 +12,6 @@ import { createVault, fillInput, launchApp, makeHome } from './helpers'
 
 const PASSWORD = 'mine-password-1234'
 const PACKAGE_PASSWORD = 'package-password-1234'
-const NEW_PASSWORD = 'merged-password-1234'
 const PNG_1X1 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
@@ -111,10 +110,10 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
   await fillInput(page.locator('#import-package-key'), packageKey)
   await fillInput(page.locator('#import-password'), PACKAGE_PASSWORD)
   await page.getByRole('button', { name: '下一步' }).click()
-  await expect(page.locator('#import-new')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('#import-mode')).toBeVisible({ timeout: 20_000 })
   await page.selectOption('#import-mode', 'merge')
-  await fillInput(page.locator('#import-new'), NEW_PASSWORD)
-  await fillInput(page.locator('#import-new-confirm'), NEW_PASSWORD)
+  // 合并导入不需要新密码：原库密码保持不变
+  await expect(page.getByText('导入后继续用当前的日记密码解锁')).toBeVisible()
   await page.getByRole('button', { name: '开始导入' }).click()
   await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 60_000 })
 
@@ -152,4 +151,10 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
       timeout: 20_000
     })
     .toBeGreaterThan(0)
+
+  // 合并导入不改变密码：重新锁定后仍用原来的日记密码解锁
+  await page.getByRole('button', { name: '锁定' }).click()
+  await expect(page.locator('#unlock-password')).toBeVisible()
+  await unlockVault(page, PASSWORD)
+  await expect(page.getByText('我自己的日记（改过）').first()).toBeVisible({ timeout: 30_000 })
 })

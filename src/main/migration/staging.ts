@@ -26,27 +26,18 @@ export async function createStagingDir(diaryDir: string, jobId: string): Promise
   return { root, vaultFile: paths.vaultFile, attachmentsDir: paths.attachmentsDir }
 }
 
-export type SwitchMode = 'replace' | 'merge'
-
 export interface SwitchResult {
   rollbackDir: string | null
 }
 
 /**
- * 把 staging 的 diary.vault（以及附件）换进正式目录。
- *
- * - `replace`：旧库的 vault 与 attachments 一起搬到 `migration/rollback-<jobId>/`，
- *   再把 staging 的整目录换进来；
- * - `merge`：只备份并替换 vault，staging 里的新附件逐个搬进现有 attachments 目录，
- *   原有附件原地保留（合并时它们仍被保留的条目引用）。
- *
- * 失败时反向恢复；成功后由 finalizeSwitch 删掉回滚目录。
+ * 把 staging 的 diary.vault 与 attachments 整体换进正式目录（用于"没有库/库被锁定"的整库导入）。
+ * 旧库先搬到 `migration/rollback-<jobId>/`；失败时反向恢复，成功后由 finalizeSwitch 删除。
  */
 export async function switchStagingIntoPlace(
   diaryDir: string,
   staging: StagingPaths,
-  jobId: string,
-  mode: SwitchMode = 'replace'
+  jobId: string
 ): Promise<SwitchResult> {
   const target = vaultPaths(diaryDir)
   const migrationDir = target.migrationDir
@@ -58,13 +49,12 @@ export async function switchStagingIntoPlace(
   }
 
   let rollbackDir: string | null = null
-  if (hasCurrentVault || (mode === 'replace' && hasCurrentAttachments)) {
+  if (hasCurrentVault || hasCurrentAttachments) {
     rollbackDir = path.join(migrationDir, `rollback-${jobId}`)
     await removePath(rollbackDir).catch(() => undefined)
     await fs.mkdir(rollbackDir, { recursive: true, mode: 0o700 })
   }
 
-  const movedIn: string[] = []
   let vaultBackedUp = false
   let attachmentsBackedUp = false
   let vaultInstalled = false
@@ -76,34 +66,19 @@ export async function switchStagingIntoPlace(
       await fs.rename(target.vaultFile, path.join(rollbackDir, 'diary.vault'))
       vaultBackedUp = true
     }
-    if (mode === 'replace' && rollbackDir && hasCurrentAttachments) {
+    if (rollbackDir && hasCurrentAttachments) {
       await fs.rename(target.attachmentsDir, path.join(rollbackDir, 'attachments'))
       attachmentsBackedUp = true
     }
 
-    if (mode === 'replace') {
-      // 旧附件目录已搬走；保险起见清掉可能存在的空目录，再整体换成 staging 的
-      if (await pathExists(target.attachmentsDir)) await removePath(target.attachmentsDir)
-      await fs.rename(staging.attachmentsDir, target.attachmentsDir)
-    } else {
-      await fs.mkdir(target.attachmentsDir, { recursive: true, mode: 0o700 })
-      const files = await fs.readdir(staging.attachmentsDir).catch(() => [] as string[])
-      for (const file of files) {
-        await fs.rename(
-          path.join(staging.attachmentsDir, file),
-          path.join(target.attachmentsDir, file)
-        )
-        movedIn.push(file)
-      }
-    }
+    // 旧附件目录已搬走；保险起见清掉可能存在的空目录，再整体换成 staging 的
+    if (await pathExists(target.attachmentsDir)) await removePath(target.attachmentsDir)
+    await fs.rename(staging.attachmentsDir, target.attachmentsDir)
 
     // 最后换 vault：即使中途断电，最坏情况是多出几个未被引用的附件
     await fs.rename(staging.vaultFile, target.vaultFile)
     vaultInstalled = true
   } catch (error) {
-    for (const file of movedIn) {
-      await fs.rm(path.join(target.attachmentsDir, file), { force: true }).catch(() => undefined)
-    }
     if (vaultInstalled) {
       await fs.rename(target.vaultFile, path.join(staging.root, 'diary.vault')).catch(() => undefined)
     }

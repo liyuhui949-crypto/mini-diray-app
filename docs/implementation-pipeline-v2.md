@@ -1616,7 +1616,13 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 导入按 `packageFormat` 决定是否需要公钥：2 需公钥，1（旧包）仍只要密码；
 - 新增 IPC：`migration:inspect`（只读清单）、`app:copyText`；`migration:export/preview` 增加 `packageKey`。
 
-### 15.7 已修复问题
+### 15.7 导入不再要求设置新密码（ADR 0005）
+
+- `migration:import` 去掉 `newPassword`；已解锁的库原地替换，keyWrap 不变 → 原密码继续可用；
+- 没有库或库被锁定时采用包内 DEK，导入后用**迁移包的私钥**解锁，界面在模式步骤直接说明；
+- 失败回滚：恢复 vault 文件与附件目录，旧数据原样写回。
+
+### 15.8 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|
