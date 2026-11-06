@@ -141,7 +141,10 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
   await page.getByRole('button', { name: '完成' }).click()
   await page.getByLabel('搜索标题和正文').fill('我自己的')
   await expect(page.getByText('搜索结果')).toBeVisible()
+  // 搜索结果先开预览对话框，再决定要不要进编辑器
   await page.getByRole('button', { name: /我自己的日记/ }).first().click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: '在日记中打开' }).click()
   await page.getByRole('button', { name: /预览/ }).click()
   const images = page.locator('img[src^="attachment://"]')
   await expect(images.first()).toBeVisible()

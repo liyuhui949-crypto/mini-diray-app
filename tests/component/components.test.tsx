@@ -7,6 +7,8 @@ import type { Attachment, DiaryEntry } from '@shared/types'
 
 import { CalendarPane } from '@/features/calendar/CalendarPane'
 import { EntryList } from '@/features/entry-list/EntryList'
+import { SearchPane } from '@/features/search/SearchPane'
+import { SearchPreviewDialog } from '@/features/search/SearchPreviewDialog'
 import { MarkdownPreview } from '@/features/editor/MarkdownPreview'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
@@ -262,6 +264,32 @@ describe('条目列表范围', () => {
     // 命中处被 <mark> 切开，这里用日期行判断是哪一篇
     expect(screen.getByText('11月6日 · 星期五')).toBeInTheDocument()
     expect(screen.queryByText('10月5日 · 星期一')).toBeNull()
+  })
+
+  it('检索洞察：概览篇数、年份分组与预览对话框', async () => {
+    const user = userEvent.setup()
+    useEntriesStore.setState({
+      searchQuery: '下雨',
+      entries: [
+        { ...entries[0]!, date: '2026-11-06', title: '雨停之后', body: '下午还在下雨，四点才停。' },
+        { ...entries[0]!, date: '2025-12-30', title: '', body: '下雨，没出门。' },
+        { ...entries[0]!, date: '2025-12-31', title: '', body: '还在下雨。' }
+      ]
+    })
+    render(
+      <>
+        <SearchPane />
+        <SearchPreviewDialog />
+      </>
+    )
+    expect(screen.getByTestId('search-hit-count')).toHaveTextContent('3篇')
+    expect(screen.getByText('2025 年 · 2 篇')).toBeInTheDocument()
+    expect(screen.getByText('2026 年 · 1 篇')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('search-row-2025-12-30'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText('正文中 1 处提到「下雨」')).toBeInTheDocument()
   })
 
   it('标签筛选也是全库视图', () => {
