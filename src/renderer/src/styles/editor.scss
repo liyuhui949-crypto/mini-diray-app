@@ -1,0 +1,107 @@
+// CodeMirror 6：把 Markdown 源码排成"像日记正文"的样子
+.cmEditor {
+  height: 100%;
+
+  .cm-editor {
+    height: 100%;
+    background: transparent;
+    color: var(--md-text-primary);
+    font-family: var(--md-font-ui);
+    font-size: 15.5px;
+    line-height: 1.9;
+  }
+
+  .cm-editor.cm-focused {
+    outline: none;
+  }
+
+  .cm-scroller {
+    font-family: inherit;
+    line-height: inherit;
+    padding: 0 0 80px;
+    scroll-behavior: smooth;
+  }
+
+  .cm-content {
+    padding: 0;
+    caret-color: var(--md-accent);
+  }
+
+  .cm-line {
+    padding: 0;
+  }
+
+  .cm-cursor,
+  .cm-dropCursor {
+    border-left: 2px solid var(--md-accent);
+  }
+
+  .cm-selectionBackground,
+  .cm-content ::selection {
+    background: var(--md-accent-soft) !important;
+  }
+
+  .cm-focused .cm-selectionBackground {
+    background: color-mix(in srgb, var(--md-accent) 18%, transparent) !important;
+  }
+
+  .cm-placeholder {
+    color: var(--md-text-tertiary);
+    font-style: normal;
+  }
+
+  .cm-activeLine {
+    background: transparent;
+  }
+
+  .mdH1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .mdH2 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .mdH3 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .mdStrong {
+    font-weight: 700;
+  }
+
+  .mdEm {
+    font-style: italic;
+  }
+
+  .mdQuote {
+    color: var(--md-text-secondary);
+    border-left: 2px solid var(--md-border-strong);
+    padding-left: 10px;
+  }
+
+  .mdLink {
+    color: var(--md-accent);
+  }
+
+  .mdCode {
+    font-family: var(--md-font-mono);
+    font-size: 13.5px;
+    background: var(--md-bg-sunken);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+
+  .mdMeta {
+    color: var(--md-text-tertiary);
+  }
+
+  .mdMarker {
+    color: var(--md-text-tertiary);
+    opacity: 0.6;
+  }
+}

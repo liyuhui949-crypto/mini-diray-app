@@ -1,0 +1,80 @@
+// 设计 Token：与原型（墨记 Inkwell）同一套色板，命名统一加 md- 前缀
+:root {
+  --md-bg-app: #fbfbfa;
+  --md-bg-surface: #fff;
+  --md-bg-sunken: #f4f4f1;
+  --md-bg-sidebar: #f7f7f4;
+  --md-page-bg: #ecebe6;
+
+  --md-text-primary: #1c1c1a;
+  --md-text-secondary: #6b6b66;
+  --md-text-tertiary: #9a9a94;
+
+  --md-border-subtle: #e9e9e4;
+  --md-border-strong: #d8d8d2;
+
+  --md-accent: #2f6f4e;
+  --md-accent-hover: #26583f;
+  --md-accent-fg: #fff;
+  --md-accent-soft: #e9f1ec;
+
+  --md-danger: #b4453a;
+  --md-danger-soft: #fbeeec;
+  --md-warn: #a9761f;
+
+  --md-heat-1: #e4ece7;
+  --md-heat-2: #c3d9cb;
+  --md-heat-3: #8fb8a1;
+  --md-heat-4: #4d8a6b;
+
+  --md-shadow-1: 0 1px 2px rgb(28 28 26 / 6%);
+  --md-shadow-2: 0 18px 50px rgb(28 28 26 / 16%), 0 2px 8px rgb(28 28 26 / 6%);
+
+  --md-r-sm: 6px;
+  --md-r-md: 10px;
+  --md-r-lg: 16px;
+
+  --md-font-ui: -apple-system, blinkmacsystemfont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', system-ui, sans-serif;
+  --md-font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', menlo, monospace;
+
+  --md-dur: 140ms;
+  --md-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --md-sidebar-w: 236px;
+  --md-list-w: 312px;
+  --md-statusbar-h: 42px;
+  --md-titlebar-h: 42px;
+}
+
+[data-theme='dark'] {
+  --md-bg-app: #151513;
+  --md-bg-surface: #1c1c1a;
+  --md-bg-sunken: #252523;
+  --md-bg-sidebar: #181816;
+  --md-page-bg: #0b0b0a;
+
+  --md-text-primary: #f2f1ec;
+  --md-text-secondary: #a5a49c;
+  --md-text-tertiary: #75746d;
+
+  --md-border-subtle: #2b2b28;
+  --md-border-strong: #3b3b36;
+
+  --md-accent: #7cba9b;
+  --md-accent-hover: #93cbaf;
+  --md-accent-fg: #10201a;
+  --md-accent-soft: #1e2a24;
+
+  --md-danger: #e08b82;
+  --md-danger-soft: #2a1a18;
+  --md-warn: #d3a45e;
+
+  --md-heat-1: #232a26;
+  --md-heat-2: #2e463a;
+  --md-heat-3: #3f6d55;
+  --md-heat-4: #6fae8a;
+
+  --md-shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+  --md-shadow-2: 0 18px 50px rgb(0 0 0 / 50%), 0 2px 8px rgb(0 0 0 / 30%);
+}

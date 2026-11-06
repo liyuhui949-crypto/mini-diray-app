@@ -1,0 +1,497 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+
+import {
+  BrowserWindow,
+  app,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+  type IpcMainInvokeEvent
+} from 'electron'
+
+import { copy } from '@shared/copy'
+import { AppError, toErrorPayload } from '@shared/errors'
+import {
+  EVENTS,
+  requestValidators,
+  type IpcChannel,
+  type IpcContract,
+  type IpcResult
+} from '@shared/ipc'
+import type { ImportFormat, StorageStats, ThemeSource } from '@shared/types'
+import { formatBytes } from '@shared/date'
+
+import { broadcast } from '../broadcast'
+import type { AppContext } from '../context'
+import { runExport } from '../export'
+import { jobs } from '../jobs'
+import { logger } from '../logger'
+import { exportMigrationPackage } from '../migration/export'
+import { defaultPackageFileName } from '../migration/package'
+import { applySpellcheck } from '../spellcheck'
+import { checkForUpdates } from '../updater'
+import { LegacyImporter } from '../vault/legacy'
+import { ensureVaultDirs, vaultPaths } from '../vault/paths'
+import { isTrustedWebContents } from '../window'
+
+const legacyImporter = new LegacyImporter()
+
+function resolveTheme(context: AppContext): ThemeSource {
+  const { theme } = context.preferences.current
+  if (theme === 'system') return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+  return theme
+}
+
+function parentWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
+  return BrowserWindow.fromWebContents(event.sender)
+}
+
+function showSave(
+  event: IpcMainInvokeEvent,
+  options: Electron.SaveDialogOptions
+): Promise<Electron.SaveDialogReturnValue> {
+  const window = parentWindow(event)
+  return window ? dialog.showSaveDialog(window, options) : dialog.showSaveDialog(options)
+}
+
+function showOpen(
+  event: IpcMainInvokeEvent,
+  options: Electron.OpenDialogOptions
+): Promise<Electron.OpenDialogReturnValue> {
+  const window = parentWindow(event)
+  return window ? dialog.showOpenDialog(window, options) : dialog.showOpenDialog(options)
+}
+
+function isTrusted(event: IpcMainInvokeEvent): boolean {
+  if (!isTrustedWebContents(event.sender)) return false
+  const url = event.senderFrame?.url ?? ''
+  if (url.startsWith('file://')) return true
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (devUrl) {
+    try {
+      return url.startsWith(new URL(devUrl).origin)
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
+type Handler<K extends IpcChannel> = (
+  payload: IpcContract[K]['req'],
+  event: IpcMainInvokeEvent
+) => Promise<IpcContract[K]['res']>
+
+function register<K extends IpcChannel>(channel: K, handler: Handler<K>): void {
+  ipcMain.handle(channel, async (event, rawPayload): Promise<IpcResult<IpcContract[K]['res']>> => {
+    if (!isTrusted(event)) {
+      logger.warn('ipc rejected: untrusted sender', { channel })
+      return { ok: false, error: { code: 'PERMISSION_DENIED', message: '不可信的调用来源' } }
+    }
+    try {
+      const validator = requestValidators[channel]
+      const payload = (validator ? validator(rawPayload) : rawPayload) as IpcContract[K]['req']
+      const data = await handler(payload, event)
+      return { ok: true, data }
+    } catch (error) {
+      if (!(error instanceof AppError)) logger.error(`ipc failed: ${channel}`, error)
+      return { ok: false, error: toErrorPayload(error) }
+    }
+  })
+}
+
+function timestampName(extension: string): string {
+  const now = new Date()
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return `Mini Diary 导出 ${stamp}.${extension}`
+}
+
+export function registerIpcHandlers(context: AppContext): void {
+  const { repository, preferences, attachments } = context
+
+  // ───────────────────────── app ─────────────────────────
+  register('app:bootstrap', async () => ({
+    prefs: preferences.current,
+    vaultStatus: await context.vaultStatus(),
+    theme: resolveTheme(context),
+    version: context.appVersion,
+    platform: process.platform,
+    dev: !app.isPackaged
+  }))
+
+  register('app:flushAck', async ({ token }) => {
+    context.ackFlush(token)
+  })
+
+  register('app:checkForUpdates', async () => {
+    await checkForUpdates()
+  })
+
+  register('app:openDiaryDir', async () => {
+    const dir = context.diaryDir
+    await ensureVaultDirs(vaultPaths(dir))
+    const error = await shell.openPath(dir)
+    if (error) throw new AppError('IO_ERROR', '无法打开目录')
+  })
+
+  register('shell:openExternal', async ({ url }) => {
+    if (!url.startsWith('https:')) throw new AppError('INVALID_INPUT', '只允许打开 https 链接')
+    await shell.openExternal(url)
+  })
+
+  // ───────────────────────── vault ─────────────────────────
+  register('vault:create', async ({ password }) => {
+    const snapshot = await repository.create(password)
+    await ensureVaultDirs(vaultPaths(context.diaryDir))
+    return snapshot
+  })
+
+  register('vault:unlock', async ({ password }) => {
+    const snapshot = await repository.unlock(password)
+    applySpellcheck(preferences.current.spellcheck)
+    return snapshot
+  })
+
+  register('vault:snapshot', async () => repository.getSnapshot())
+
+  register('vault:lock', async () => {
+    await context.lock('manual')
+  })
+
+  register('vault:changePassword', async ({ currentPassword, newPassword }) => {
+    await repository.changePassword(currentPassword, newPassword)
+  })
+
+  register('vault:moveDirectory', async ({ targetDir }) => {
+    if (!path.isAbsolute(targetDir)) throw new AppError('INVALID_INPUT', '目录必须是绝对路径')
+    const result = await repository.moveDirectory(targetDir)
+    await preferences.update({ diaryDir: result.diaryDir })
+    context.applyDiaryDir(result.diaryDir)
+    return result
+  })
+
+  register('vault:reset', async ({ password }) => {
+    const snapshot = await repository.reset(password)
+    await attachments.cleanupParts()
+    return snapshot
+  })
+
+  register('vault:delete', async ({ password }) => {
+    await repository.deleteVault(password)
+  })
+
+  // ───────────────────────── entries ─────────────────────────
+  register('entry:save', async ({ entry }) => repository.saveEntry(entry))
+  register('entry:delete', async ({ date }) => repository.deleteEntry(date))
+
+  // ───────────────────────── attachments ─────────────────────────
+  const addAttachmentFromPath = async (sourcePath: string): Promise<IpcContract['attachment:addFromPath']['res']> => {
+    if (!path.isAbsolute(sourcePath)) throw new AppError('INVALID_INPUT', '附件路径必须是绝对路径')
+    const job = jobs.create('attachment')
+    try {
+      const attachment = await attachments.addFromFile(sourcePath, {
+        signal: job.signal,
+        onProgress: ({ bytesDone, bytesTotal }) => {
+          job.report(bytesTotal === 0 ? 0 : bytesDone / bytesTotal, `加密写入 ${formatBytes(bytesDone)}`, {
+            bytesDone,
+            bytesTotal
+          })
+        }
+      })
+      job.done({ path: attachment.id })
+      return attachment
+    } catch (error) {
+      job.fail(error instanceof AppError ? error.message : '附件写入失败')
+      throw error
+    }
+  }
+
+  register('attachment:addFromPath', async ({ sourcePath }) => addAttachmentFromPath(sourcePath))
+
+  register('attachment:addFromDialog', async (_payload, event) => {
+    const result = await showOpen(event, {
+      title: copy.attachments.add,
+      properties: ['openFile'],
+      filters: [
+        { name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg'] },
+        { name: '音频', extensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'] },
+        { name: '视频', extensions: ['mp4', 'm4v', 'mov', 'webm'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const filePath = result.filePaths[0]
+    if (!filePath) return null
+    return addAttachmentFromPath(filePath)
+  })
+
+  register('attachment:addBytes', async ({ name, mime, bytes }) => attachments.addFromBytes({ name, mime, bytes }))
+
+  register('attachment:saveAs', async ({ id }, event) => {
+    const found = repository.findAttachment(id)
+    if (!found) throw new AppError('NOT_FOUND')
+    const result = await showSave(event, {
+      title: copy.attachments.saveAsTitle,
+      defaultPath: found.attachment.name,
+      buttonLabel: '导出'
+    })
+    if (result.canceled || !result.filePath) return { path: null }
+    await attachments.exportTo(found.attachment, result.filePath)
+    return { path: result.filePath }
+  })
+
+  register('attachment:delete', async () => {
+    // 只删除条目引用；blob 留到“清理未引用附件”时再释放
+  })
+
+  register('attachment:cancel', async ({ jobId }) => {
+    jobs.cancel(jobId)
+  })
+
+  register('attachment:cleanup', async ({ dryRun, ids }) => {
+    const referenced = new Set(
+      repository.getSnapshot().entries.flatMap((entry) => entry.attachments.map((item) => item.id))
+    )
+    const files = await attachments.listFiles()
+    const orphans: string[] = []
+    let bytes = 0
+    for (const file of files) {
+      const id = path.basename(file, '.mdat')
+      if (referenced.has(id)) continue
+      orphans.push(id)
+      bytes += await attachments.sizeOf(id)
+    }
+
+    if (dryRun) return { count: orphans.length, bytes, ids: orphans }
+
+    const targets = ids && ids.length > 0 ? orphans.filter((id) => ids.includes(id)) : orphans
+    let removedBytes = 0
+    for (const id of targets) {
+      removedBytes += await attachments.sizeOf(id)
+      await attachments.remove(id)
+    }
+    logger.info('unreferenced attachments removed', { count: targets.length })
+    return { count: targets.length, bytes: removedBytes, ids: targets }
+  })
+
+  // ───────────────────────── preferences ─────────────────────────
+  register('prefs:read', async () => preferences.current)
+
+  register('prefs:update', async (patch) => {
+    if (patch.diaryDir) throw new AppError('INVALID_INPUT', '目录变更请使用迁移流程')
+    const previous = preferences.current
+    const next = await preferences.update(patch)
+    if (previous.spellcheck !== next.spellcheck) applySpellcheck(next.spellcheck)
+    broadcast(EVENTS.prefsChanged, next)
+    if (previous.theme !== next.theme) {
+      broadcast(EVENTS.themeChanged, { theme: resolveTheme(context), source: 'preference' })
+    }
+    return next
+  })
+
+  // ───────────────────────── dialogs ─────────────────────────
+  register('dialog:pickDirectory', async ({ purpose }, event) => {
+    const result = await showOpen(event, {
+      title: purpose,
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return { path: result.canceled ? null : (result.filePaths[0] ?? null) }
+  })
+
+  register('dialog:openFile', async ({ purpose, format }, event) => {
+    const filters =
+      purpose === 'migration'
+        ? [{ name: 'Mini Diary 迁移包', extensions: ['minidiary'] }]
+        : importFilters(format)
+    const result = await showOpen(event, {
+      title: purpose === 'migration' ? copy.migration.importTitle : copy.importDialog.title,
+      properties: ['openFile'],
+      filters
+    })
+    return { path: result.canceled ? null : (result.filePaths[0] ?? null) }
+  })
+
+  // ───────────────────────── migration ─────────────────────────
+  register('migration:export', async ({ packagePassword }, event) => {
+    const directory = preferences.current.lastExportDir ?? app.getPath('documents')
+    const result = await showSave(event, {
+      title: copy.migration.exportTitle,
+      defaultPath: path.join(directory, defaultPackageFileName()),
+      filters: [{ name: 'Mini Diary 迁移包', extensions: ['minidiary'] }]
+    })
+    if (result.canceled || !result.filePath) return { path: null, summary: null }
+
+    const job = jobs.create('migration-export')
+    try {
+      const exported = await exportMigrationPackage(
+        { repository, store: attachments, appVersion: context.appVersion },
+        {
+          targetPath: result.filePath,
+          packagePassword,
+          preferences: preferences.current,
+          job
+        }
+      )
+      job.done({ path: exported.path })
+      await preferences.update({ lastExportDir: path.dirname(exported.path) })
+      return { path: exported.path, summary: exported.summary }
+    } catch (error) {
+      job.fail(error instanceof AppError ? error.message : '导出失败')
+      throw error
+    }
+  })
+
+  register('migration:preview', async ({ filePath, packagePassword }) =>
+    context.migrationImport.preview(filePath, packagePassword)
+  )
+
+  register('migration:import', async ({ token, mode, newPassword }) => {
+    const job = jobs.create('migration-import')
+    try {
+      const result = await context.migrationImport.run({ token, mode, newPassword, job })
+      if (result.prefs) {
+        const next = await preferences.update({
+          theme: result.prefs.theme,
+          firstDayOfWeek: result.prefs.firstDayOfWeek,
+          hideTitle: result.prefs.hideTitle,
+          allowFutureEntries: result.prefs.allowFutureEntries,
+          spellcheck: result.prefs.spellcheck,
+          autoLockMinutes: result.prefs.autoLockMinutes
+        })
+        applySpellcheck(next.spellcheck)
+        broadcast(EVENTS.prefsChanged, next)
+      }
+      return {
+        revision: result.revision,
+        entries: result.entries,
+        attachments: result.attachments,
+        merged: result.merged
+      }
+    } catch (error) {
+      job.fail(error instanceof AppError ? error.message : '导入失败')
+      throw error
+    }
+  })
+
+  register('migration:cancel', async ({ jobId }) => {
+    jobs.cancel(jobId)
+  })
+
+  // ───────────────────────── external import / export ─────────────────────────
+  register('import:preview', async ({ format, filePath }) => context.externalImport.preview(format, filePath))
+
+  register('import:commit', async ({ token }) => context.externalImport.commit(token))
+
+  register('import:cancel', async ({ token }) => {
+    context.externalImport.cancel(token)
+  })
+
+  register('export:run', async ({ format, includeAttachments, html }, event) => {
+    const directory = preferences.current.lastExportDir ?? app.getPath('documents')
+    let targetPath: string | null = null
+
+    if (format === 'markdown') {
+      const result = await showOpen(event, {
+        title: '选择导出目录',
+        defaultPath: directory,
+        properties: ['openDirectory', 'createDirectory']
+      })
+      targetPath = result.canceled ? null : (result.filePaths[0] ?? null)
+    } else {
+      const extension = format === 'miniDiaryJson' ? 'json' : format === 'dayOneTxt' ? 'txt' : 'pdf'
+      const result = await showSave(event, {
+        title: copy.exportDialog.title,
+        defaultPath: path.join(directory, timestampName(extension)),
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }]
+      })
+      targetPath = result.canceled ? null : result.filePath
+    }
+    if (!targetPath) return { path: null }
+
+    const job = jobs.create('export')
+    try {
+      const exported = await runExport(
+        {
+          repository,
+          store: attachments,
+          appVersion: context.appVersion,
+          attachmentHandler: (request) => context.attachmentProtocol.handleRequest(request)
+        },
+        {
+          format,
+          targetPath,
+          includeAttachments: includeAttachments ?? true,
+          html,
+          job
+        }
+      )
+      job.done({ path: exported.path })
+      await preferences.update({ lastExportDir: path.dirname(exported.path) })
+      return { path: exported.path }
+    } catch (error) {
+      job.fail(error instanceof AppError ? error.message : '导出失败')
+      throw error
+    }
+  })
+
+  // ───────────────────────── stats ─────────────────────────
+  register('stats:storage', async (): Promise<StorageStats> => {
+    const snapshot = repository.isUnlocked ? repository.getSnapshot() : null
+    const referenced = new Set(
+      (snapshot?.entries ?? []).flatMap((entry) => entry.attachments.map((item) => item.id))
+    )
+    const files = await attachments.listFiles()
+    let attachmentBytes = 0
+    let orphanBytes = 0
+    let orphanCount = 0
+    for (const file of files) {
+      const id = path.basename(file, '.mdat')
+      const size = await attachments.sizeOf(id)
+      attachmentBytes += size
+      if (!referenced.has(id)) {
+        orphanCount += 1
+        orphanBytes += size
+      }
+    }
+    const vaultStats = await fs.stat(vaultPaths(context.diaryDir).vaultFile).catch(() => null)
+    return {
+      entryCount: snapshot?.entries.length ?? 0,
+      attachmentCount: files.length,
+      attachmentBytes,
+      orphanCount,
+      orphanBytes,
+      vaultBytes: vaultStats?.size ?? 0
+    }
+  })
+
+  // ───────────────────────── legacy migration ─────────────────────────
+  register('legacy:importPreview', async ({ filePath, password }) =>
+    legacyImporter.preview(filePath, password)
+  )
+
+  register('legacy:commit', async ({ token }) => {
+    const entries = legacyImporter.take(token).map((entry) => ({ ...entry, attachments: [] }))
+    const result = await repository.upsertEntries(entries)
+    return { revision: result.revision, entries: result.added + result.merged }
+  })
+}
+
+function importFilters(format?: ImportFormat): Array<{ name: string; extensions: string[] }> {
+  switch (format) {
+    case 'dayOneJson':
+      return [{ name: 'Day One JSON', extensions: ['json'] }]
+    case 'jrnlJson':
+      return [{ name: 'jrnl JSON', extensions: ['json'] }]
+    case 'miniDiaryJson':
+      return [{ name: 'Mini Diary JSON', extensions: ['json'] }]
+    case 'dayOneTxt':
+      return [{ name: 'Day One TXT', extensions: ['txt'] }]
+    default:
+      return [
+        { name: '所有支持的格式', extensions: ['json', 'txt'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+  }
+}

@@ -1,0 +1,12 @@
+# pnpm 11 的构建设置放在这里（package.json 的 pnpm 字段已不再读取）
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - esbuild
+  - sass-embedded
+
+# 让 `pnpm <script>` 直接运行，不要每次都重新校验依赖
+verifyDepsBeforeRun: false
+minimumReleaseAge: 0
+allowBuilds:
+  electron-winstaller: set this to true or false

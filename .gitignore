@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+out/
+dist/
+release/
+coverage/
+playwright-report/
+test-results/
+tmp-shots/
+
+# logs & os
+*.log
+logs/
+.DS_Store
+
+# local env
+.env
+.env.local
