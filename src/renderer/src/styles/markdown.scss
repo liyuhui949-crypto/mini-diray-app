@@ -5,7 +5,8 @@
   color: var(--md-text-primary);
   overflow-wrap: anywhere;
 
-  p {
+  p,
+  .mdPara {
     margin: 0 0 15px;
   }
 

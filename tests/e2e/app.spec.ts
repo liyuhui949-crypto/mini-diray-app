@@ -64,7 +64,17 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   await page.locator('.cm-content').click()
   await page.keyboard.type('下午四点雨停了。')
   await page.keyboard.type('\n\n这几天一直在想**专注**这件事。')
-  await expect(page.getByText(/已保存/)).toBeVisible({ timeout: 15_000 })
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async () => {
+          const snapshot = await window.miniDiary.invoke('vault:snapshot', undefined)
+          if (!snapshot.ok) return ''
+          return snapshot.data.entries.map((entry) => entry.body).join('|')
+        }),
+      { timeout: 20_000 }
+    )
+    .toContain('专注')
 
   // 3. 搜索
   await page.getByLabel('搜索标题和正文').fill('专注')
@@ -82,20 +92,32 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   await page.locator('.cm-content').click()
   await page.keyboard.press('Meta+End')
   await page.getByRole('button', { name: '附件' }).click()
-  await expect(page.getByText(/已保存/)).toBeVisible({ timeout: 20_000 })
+
+  // 等附件真正写进库（自动保存是 800ms 防抖，不能只看“已保存”文案）
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async () => {
+          const snapshot = await window.miniDiary.invoke('vault:snapshot', undefined)
+          if (!snapshot.ok) return ''
+          const entry = snapshot.data.entries.find((item) => item.attachments.length > 0)
+          return entry?.attachments[0]?.id ?? ''
+        }),
+      { timeout: 30_000 }
+    )
+    .toMatch(/^[0-9a-f-]{36}$/)
 
   const attachmentId = await page.evaluate(async () => {
     const snapshot = await window.miniDiary.invoke('vault:snapshot', undefined)
     if (!snapshot.ok) throw new Error('取快照失败')
-    const entry = snapshot.data.entries.find((item: { attachments: unknown[] }) => item.attachments.length > 0)
+    const entry = snapshot.data.entries.find((item) => item.attachments.length > 0)
     return entry?.attachments[0]?.id ?? ''
   })
-  expect(attachmentId).toMatch(/^[0-9a-f-]{36}$/)
 
   await page.getByRole('button', { name: /预览/ }).click()
   const attachment = { id: attachmentId }
 
-  const image = page.locator(`img[src="attachment://${attachment.id}"]`)
+  const image = page.locator(`.mdPreview img[src="attachment://${attachment.id}"]`)
   await expect(image).toBeVisible()
   await expect
     .poll(async () => image.evaluate((element: HTMLImageElement) => element.naturalWidth), {

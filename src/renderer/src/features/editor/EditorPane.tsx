@@ -35,6 +35,7 @@ const HUGE_FILE_BYTES = 300 * 1024 * 1024
 
 export function EditorPane(): React.JSX.Element {
   const draft = useEntriesStore((state) => state.draft)
+  const savedEntries = useEntriesStore((state) => state.entries)
   const activeDate = useEntriesStore((state) => state.activeDate)
   const saveState = useEntriesStore((state) => state.saveState)
   const savedAt = useEntriesStore((state) => state.savedAt)
@@ -72,6 +73,11 @@ export function EditorPane(): React.JSX.Element {
     () => (draft ? countEntryWords(draft.title, draft.body) : 0),
     [draft]
   )
+  // 只有已经写进库的附件才能通过 attachment:// 读取，刚加入的等保存完成再显示缩略图
+  const persistedIds = useMemo(() => {
+    const saved = savedEntries.find((item) => item.date === activeDate)
+    return new Set((saved?.attachments ?? []).map((item) => item.id))
+  }, [savedEntries, activeDate])
 
   if (!draft) {
     return <div className={styles.pane} />
@@ -320,7 +326,10 @@ export function EditorPane(): React.JSX.Element {
                   </div>
                   {draft.attachments.map((attachment) => (
                     <div key={attachment.id} className={styles.attachRow}>
-                      <AttachmentGlyph attachment={attachment} />
+                      <AttachmentGlyph
+                        attachment={attachment}
+                        persisted={persistedIds.has(attachment.id)}
+                      />
                       <span className={styles.attachName}>{attachment.name}</span>
                       <span className={styles.attachSize}>{formatBytes(attachment.size)}</span>
                       <span className={styles.attachLock}>
@@ -421,9 +430,15 @@ export function EditorPane(): React.JSX.Element {
   )
 }
 
-function AttachmentGlyph({ attachment }: { attachment: Attachment }): React.JSX.Element {
-  if (attachment.kind === 'image') {
-    return <img className={styles.glyph} src={`attachment://${attachment.id}`} alt="" loading="lazy" />
+function AttachmentGlyph({
+  attachment,
+  persisted
+}: {
+  attachment: Attachment
+  persisted: boolean
+}): React.JSX.Element {
+  if (attachment.kind === 'image' && persisted) {
+    return <img className={styles.glyph} src={`attachment://${attachment.id}`} alt="" />
   }
   return (
     <span className={styles.glyphFallback}>

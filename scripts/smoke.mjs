@@ -44,6 +44,24 @@ await page.keyboard.type('下午四点雨停了。\n\n窗外的树被打得发�
 await page.waitForTimeout(1600)
 await page.screenshot({ path: path.join(shots, '03-editor.png') })
 
+// 附件 + 预览
+const pngPath = path.join(home, 'shot.png')
+const { writeFile } = await import('node:fs/promises')
+await writeFile(
+  pngPath,
+  Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64'
+  )
+)
+await app.evaluate(({ dialog }, target) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [target] })
+}, pngPath)
+await page.locator('.cm-content').click()
+await page.keyboard.press('Meta+End')
+await page.getByRole('button', { name: '附件' }).click()
+await page.waitForTimeout(1800)
+
 // 预览
 await page.click('text=预览')
 await page.waitForTimeout(400)

@@ -27,6 +27,17 @@ const schema = {
 
 const ATTACHMENT_SRC_RE = /^attachment:\/\/([0-9a-f-]{36})$/i
 
+/**
+ * react-markdown v10 默认会清空未知协议的 URL（安全考虑），
+ * 这里显式放行 attachment:，否则图片与媒体引用会被抹成空串。
+ */
+function urlTransform(url: string): string {
+  if (url.startsWith('attachment://')) return url
+  if (/^https:\/\//.test(url)) return url
+  if (/^(#|\/|\.\/|\.\.\/)/.test(url)) return url
+  return ''
+}
+
 interface MarkdownPreviewProps {
   body: string
   attachments: readonly Attachment[]
@@ -40,7 +51,10 @@ export function MarkdownPreview({ body, attachments }: MarkdownPreviewProps): Re
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[[rehypeSanitize, schema]]}
+        urlTransform={urlTransform}
         components={{
+          // 段落用 div：附件 figure / 媒体卡片是块级元素，放进 <p> 会造成非法嵌套
+          p: ({ children }) => <div className="mdPara">{children}</div>,
           img: ({ src, alt }) => {
             const id = typeof src === 'string' ? ATTACHMENT_SRC_RE.exec(src)?.[1]?.toLowerCase() : undefined
             const attachment = id ? byId.get(id) : undefined
@@ -81,7 +95,6 @@ function PreviewImage({ attachment }: { attachment: Attachment }): React.JSX.Ele
       <img
         src={`attachment://${attachment.id}`}
         alt={attachment.name}
-        loading="lazy"
         onClick={() => openLightbox(attachment.id)}
         onError={(event) => {
           event.currentTarget.style.display = 'none'

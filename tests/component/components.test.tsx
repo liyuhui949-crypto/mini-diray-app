@@ -3,9 +3,10 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { DiaryEntry } from '@shared/types'
+import type { Attachment, DiaryEntry } from '@shared/types'
 
 import { CalendarPane } from '@/features/calendar/CalendarPane'
+import { MarkdownPreview } from '@/features/editor/MarkdownPreview'
 import { TagEditor } from '@/features/editor/TagEditor'
 
 afterEach(() => {
@@ -122,5 +123,52 @@ describe('标签编辑', () => {
     render(<TagEditor tags={['日常']} onChange={vi.fn()} readOnly />)
     expect(screen.queryByLabelText('删除标签 日常')).toBeNull()
     expect(screen.queryByLabelText('＋ 标签')).toBeNull()
+  })
+})
+
+
+describe('Markdown 预览', () => {
+  const image: Attachment = {
+    id: '6d5f1c1e-8f4a-4a7b-9c1d-2f3a4b5c6d7e',
+    name: '窗外的梧桐.png',
+    mime: 'image/png',
+    kind: 'image',
+    size: 2048,
+    sha256: 'a'.repeat(64),
+    chunkSize: 1024 * 1024,
+    totalChunks: 1,
+    createdAt: '2026-11-06T00:00:00.000Z'
+  }
+
+  it('放行 attachment:// 图片（react-markdown 默认会抹掉未知协议）', () => {
+    render(<MarkdownPreview body={`![梧桐](attachment://${image.id})`} attachments={[image]} />)
+    const img = screen.getByRole('img')
+    expect(img).toHaveAttribute('src', `attachment://${image.id}`)
+    expect(img).toHaveAttribute('alt', '窗外的梧桐.png')
+  })
+
+  it('音频与视频渲染为原生播放器卡片', () => {
+    const audio: Attachment = { ...image, id: '00000000-0000-4000-8000-00000000000a', name: '录音.m4a', kind: 'audio', mime: 'audio/mp4' }
+    const video: Attachment = { ...image, id: '00000000-0000-4000-8000-00000000000b', name: '雨声.mp4', kind: 'video', mime: 'video/mp4' }
+    const { container } = render(
+      <MarkdownPreview
+        body={`[录音](attachment://${audio.id})\n\n[雨声](attachment://${video.id})`}
+        attachments={[audio, video]}
+      />
+    )
+    expect(container.querySelector('audio')?.getAttribute('src')).toBe(`attachment://${audio.id}`)
+    expect(container.querySelector('video')?.getAttribute('src')).toBe(`attachment://${video.id}`)
+  })
+
+  it('外部链接只保留 https，越界协议不生成 href', () => {
+    render(
+      <MarkdownPreview
+        body={'[外链](https://example.com)\n\n[坏链](javascript:alert(1))'}
+        attachments={[]}
+      />
+    )
+    const link = screen.getByText('外链').closest('a')
+    expect(link).toHaveAttribute('href', 'https://example.com')
+    expect(screen.getByText('坏链').closest('a')).toBeNull()
   })
 })

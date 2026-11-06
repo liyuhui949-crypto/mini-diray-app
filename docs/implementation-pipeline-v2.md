@@ -1555,8 +1555,9 @@ pnpm package:linux
 ### 15.1 验证结果
 
 ```bash
-pnpm verify          # typecheck（3 套 tsconfig）+ eslint + stylelint + 104 单测 + 8 组件测试 + build 全绿
-pnpm test:e2e        # Playwright + 真实 Electron：建库 → 写作 → 附件加密/解密 → 锁定(423) → 解锁 → 重启仍在
+pnpm verify          # typecheck（3 套 tsconfig）+ eslint + stylelint + 104 单测 + 11 组件测试 + build 全绿
+pnpm test:e2e        # Playwright + 真实 Electron（2 条）：建库→写作→附件加密/解密→锁定(423)→解锁→重启仍在；
+                     #                       以及 导出 .minidiary → 全新安装导入 → 新密码解锁
 node scripts/smoke.mjs   # 冒烟脚本：8 张界面截图 + PDF 导出（13 KB，中文正常）
 node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，未签名）
 ```
