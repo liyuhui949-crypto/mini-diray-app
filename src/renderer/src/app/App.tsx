@@ -8,6 +8,7 @@ import { Dialogs } from '@/app/Dialogs'
 import { BusyOverlay } from '@/app/parts/BusyOverlay'
 import { Shell } from '@/app/Shell'
 import { Lightbox } from '@/features/attachments/Lightbox'
+import { SearchPreviewDialog } from '@/features/search/SearchPreviewDialog'
 import { ToastHost } from '@/components/ui'
 import { Onboarding } from '@/features/onboarding/Onboarding'
 import { UnlockView } from '@/features/unlock/UnlockView'
@@ -60,6 +61,7 @@ export default function App(): React.JSX.Element {
         useVaultStore.getState().setLocked(reason)
         const ui = useUiStore.getState()
         ui.closeLightbox()
+        ui.closeSearchPreview()
         ui.setView('editor')
       }),
       subscribe('prefs:changed', (prefs) => {
@@ -172,6 +174,7 @@ export default function App(): React.JSX.Element {
       {status === 'locked' ? <UnlockView /> : null}
       {status === 'unlocked' ? <Shell /> : null}
       <Dialogs />
+      <SearchPreviewDialog />
       <Lightbox />
       <BusyOverlay />
       <ToastHost />

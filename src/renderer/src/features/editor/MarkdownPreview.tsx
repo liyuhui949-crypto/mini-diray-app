@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+
 import { Download, FileAudio, FileVideo } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -5,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 
 import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
+import { highlightSegments } from '@shared/search'
 import type { Attachment } from '@shared/types'
 
 import { call } from '@/api/client'
@@ -41,16 +44,72 @@ function urlTransform(url: string): string {
 interface MarkdownPreviewProps {
   body: string
   attachments: readonly Attachment[]
+  /** 检索词：渲染时把命中文本包进 <mark class="mdHit"> */
+  highlight?: string
 }
 
-export function MarkdownPreview({ body, attachments }: MarkdownPreviewProps): React.JSX.Element {
+/** hast 的最小结构，只为写一个不依赖额外包的高亮插件 */
+interface HastNode {
+  type: string
+  tagName?: string
+  value?: string
+  properties?: Record<string, unknown>
+  children?: HastNode[]
+}
+
+function markTextNodes(parent: HastNode, query: string): void {
+  if (!parent.children) return
+  const next: HastNode[] = []
+  for (const child of parent.children) {
+    if (child.type === 'text' && typeof child.value === 'string') {
+      const segments = highlightSegments(child.value, query)
+      if (segments.length <= 1 && !segments[0]?.match) {
+        next.push(child)
+        continue
+      }
+      for (const segment of segments) {
+        if (!segment.match) {
+          next.push({ type: 'text', value: segment.text })
+          continue
+        }
+        next.push({
+          type: 'element',
+          tagName: 'mark',
+          properties: { className: ['mdHit'] },
+          children: [{ type: 'text', value: segment.text }]
+        })
+      }
+      continue
+    }
+    if (child.children) markTextNodes(child, query)
+    next.push(child)
+  }
+  parent.children = next
+}
+
+/** rehype 插件：在 sanitize 之后把命中的文字包成 mark（节点由我们自己生成，安全） */
+function rehypeSearchHighlight(query: string) {
+  return (tree: unknown): void => {
+    if (query.trim()) markTextNodes(tree as HastNode, query)
+  }
+}
+
+export function MarkdownPreview({
+  body,
+  attachments,
+  highlight
+}: MarkdownPreviewProps): React.JSX.Element {
   const byId = new Map(attachments.map((attachment) => [attachment.id.toLowerCase(), attachment]))
+  const rehypePlugins = useMemo(
+    () => [[rehypeSanitize, schema], [rehypeSearchHighlight, highlight ?? '']] as const,
+    [highlight]
+  )
 
   return (
     <div className="mdPreview">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeSanitize, schema]]}
+        rehypePlugins={rehypePlugins as unknown as React.ComponentProps<typeof ReactMarkdown>['rehypePlugins']}
         urlTransform={urlTransform}
         components={{
           // 段落用 div：附件 figure / 媒体卡片是块级元素，放进 <p> 会造成非法嵌套

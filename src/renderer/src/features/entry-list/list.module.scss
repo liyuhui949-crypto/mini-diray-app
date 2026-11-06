@@ -169,6 +169,13 @@
   overflow: hidden;
 }
 
+.hit {
+  background: var(--md-accent-soft);
+  color: var(--md-text-primary);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .itemSnippet {
   font-size: 12px;
   color: var(--md-text-secondary);

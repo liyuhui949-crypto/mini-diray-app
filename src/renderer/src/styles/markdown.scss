@@ -1,3 +1,13 @@
+// 检索命中高亮：预览对话框与编辑器共用同一套观感
+mark.mdHit,
+.cmHit {
+  background: var(--md-accent-soft);
+  color: var(--md-text-primary);
+  border-radius: 2px;
+  padding: 0 1px;
+  box-shadow: inset 0 -1px 0 var(--md-accent);
+}
+
 // Markdown 预览：与原型 .doc-body 的排版保持一致
 .mdPreview {
   font-size: 15.5px;
@@ -112,5 +122,16 @@
   th {
     background: var(--md-bg-sunken);
     font-weight: 600;
+  }
+}
+
+
+.searchDoc {
+  font-size: 14px;
+  line-height: 1.9;
+
+  .mdPara,
+  p {
+    margin: 0 0 12px;
   }
 }

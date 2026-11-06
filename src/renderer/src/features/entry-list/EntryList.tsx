@@ -3,7 +3,12 @@ import { useMemo } from 'react'
 import { Paperclip, Plus } from 'lucide-react'
 
 import { copy } from '@shared/copy'
-import { filterByTag, highlightSegments, searchEntries } from '@shared/search'
+import {
+  analyzeSearch,
+  filterByTag,
+  highlightSegments,
+  type HighlightSegment
+} from '@shared/search'
 import { formatMonthDayWithWeekdayCN, monthOf, todayLocalDate } from '@shared/date'
 import type { DiaryEntry } from '@shared/types'
 import { countEntryWords, deriveTitle, makeSnippet } from '@shared/words'
@@ -18,6 +23,8 @@ interface ListItem {
   date: string
   title: string
   snippet: string
+  /** 检索结果用结构化片段（最多两条，带高亮段） */
+  snippets?: HighlightSegment[][]
   attachments: number
 }
 
@@ -30,6 +37,7 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
   const setTag = useEntriesStore((state) => state.setTag)
   const prefs = usePrefsStore((state) => state.prefs)
   const setView = useUiStore((state) => state.setView)
+  const openSearchPreview = useUiStore((state) => state.openSearchPreview)
   const calendarMonth = useUiStore((state) => state.calendarMonth)
   const listScope = useUiStore((state) => state.listScope)
   const setListScope = useUiStore((state) => state.setListScope)
@@ -60,10 +68,14 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
 
     // 搜索与标签是"全库"视图；只有普通列表跟随日历月份
     if (searching) {
-      return searchEntries(entries, query, { hideTitle }).map((hit) => ({
+      // 与检索洞察共用同一次分析结果，保证"卡片说几篇、列表就是几条"
+      const analysis = analyzeSearch(entries, query, { hideTitle })
+      return (analysis?.hits ?? []).map((hit) => ({
         date: hit.entry.date,
-        title: hit.title || copy.list.untitled,
-        snippet: hit.snippet,
+        // 无标题时不重复显示"正文首行"，交给片段说明
+        title: hideTitle ? '' : hit.entry.title.trim(),
+        snippet: hit.snippets[0]?.text ?? '',
+        snippets: hit.snippets.map((snippet) => snippet.segments),
         attachments: hit.entry.attachments.length
       }))
     }
@@ -97,7 +109,12 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
   const showScopeToggle = !searching && !tag
 
   return (
-    <section className={styles.list} data-collapsed={collapsed} aria-hidden={collapsed}>
+    <section
+      className={styles.list}
+      data-testid="entry-list"
+      data-collapsed={collapsed}
+      aria-hidden={collapsed}
+    >
       <header className={styles.head}>
         <div className={styles.headRow}>
           <h2>{heading}</h2>
@@ -164,6 +181,11 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
                 type="button"
                 className={[styles.item, isActive ? styles.itemActive : ''].filter(Boolean).join(' ')}
                 onClick={() => {
+                  // 搜索结果是"预览"而不是跳转：先把这篇看完整，再决定要不要打开
+                  if (searching) {
+                    openSearchPreview(item.date)
+                    return
+                  }
                   setView('editor')
                   void openDate(item.date)
                 }}
@@ -177,10 +199,26 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
                     </span>
                   ) : null}
                 </div>
-                <div className={styles.itemTitle}>
-                  <Highlighted text={item.title} query={query} />
-                </div>
-                {item.snippet ? (
+                {item.title ? (
+                  <div className={styles.itemTitle}>
+                    <Highlighted text={item.title} query={query} />
+                  </div>
+                ) : null}
+                {item.snippets ? (
+                  item.snippets.map((segments, index) => (
+                    <div key={`${item.date}-snippet-${index}`} className={styles.itemSnippet}>
+                      {segments.map((segment, segIndex) =>
+                        segment.match ? (
+                          <mark key={segIndex} className={styles.hit}>
+                            {segment.text}
+                          </mark>
+                        ) : (
+                          <span key={segIndex}>{segment.text}</span>
+                        )
+                      )}
+                    </div>
+                  ))
+                ) : item.snippet ? (
                   <div className={styles.itemSnippet}>
                     <Highlighted text={item.snippet} query={query} />
                   </div>
