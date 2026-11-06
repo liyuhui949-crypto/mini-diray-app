@@ -14,6 +14,7 @@ import {
 import { escapeHtml, renderMarkdownToHtml } from '@shared/markdown'
 import { isValidLocalDate, normalizeTags, passwordSchema, preferencesSchema } from '@shared/schemas'
 import {
+  LEGACY_PACKAGE_KEY_LENGTH,
   PACKAGE_KEY_ALPHABET,
   PACKAGE_KEY_LENGTH,
   composePackageSecret,
@@ -329,38 +330,56 @@ describe('Schema 与标签规范化', () => {
 
 
 describe('迁移包公钥', () => {
-  it('生成的公钥长度为 32 且只含约定字母表字符', () => {
+  it('生成的公钥为 128 位，且只含约定字母表字符', () => {
     const key = generatePackageKey()
     expect(key).toHaveLength(PACKAGE_KEY_LENGTH)
+    expect(PACKAGE_KEY_LENGTH).toBe(128)
     for (const char of key) expect(PACKAGE_KEY_ALPHABET).toContain(char)
     expect(isValidPackageKey(key)).toBe(true)
     expect(generatePackageKey()).not.toBe(key)
+    // 同时包含大小写与数字，说明字母表是混合的
+    expect(key).toMatch(/[A-Z]/)
+    expect(key).toMatch(/[a-z]/)
+    expect(key).toMatch(/[0-9]/)
   })
 
-  it('展示分组、导入时忽略短横线与大小写', () => {
-    const key = `${PACKAGE_KEY_ALPHABET}23`
-    expect(key).toHaveLength(32)
-    expect(formatPackageKey(key)).toBe('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23')
-    expect(normalizePackageKey('abcd-efgh jkmn_pqrs')).toBe('ABCDEFGHJKMNPQRS')
-    expect(isValidPackageKey(formatPackageKey(key))).toBe(true)
-    expect(isValidPackageKey('2345-6789-abcd-efgh-jkmn-pqrs-tvwx-yz23')).toBe(true)
+  it('展示按 4 位分组；导入时忽略短横线但保留大小写', () => {
+    const key = PACKAGE_KEY_ALPHABET.repeat(3).slice(0, 128)
+    const formatted = formatPackageKey(key)
+    expect(formatted).toHaveLength(128 + 31)
+    expect(formatted.split('-')).toHaveLength(32)
+    expect(normalizePackageKey(formatted)).toBe(key)
+    expect(formatPackageKey(formatted)).toBe(formatted)
+    // 大小写敏感：换成大写后不再是同一个公钥
+    expect(normalizePackageKey(formatted).toUpperCase()).not.toBe(key)
   })
 
   it('拒绝长度不对或含歧义字符的公钥', () => {
     expect(isValidPackageKey('')).toBe(false)
     expect(isValidPackageKey('ABCD-EFGH')).toBe(false)
-    // 0 / I 不在字母表里，长度再怎么够也不合法
-    expect(isValidPackageKey('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-Y0ZZ')).toBe(false)
-    expect(isValidPackageKey('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YIZZ')).toBe(false)
+    const valid = 'A'.repeat(128)
+    expect(isValidPackageKey(valid)).toBe(true)
+    // 0 / O / I / l 不在字母表里
+    expect(isValidPackageKey(`${'A'.repeat(127)}0`)).toBe(false)
+    expect(isValidPackageKey(`${'A'.repeat(127)}O`)).toBe(false)
+    expect(isValidPackageKey(`${'A'.repeat(127)}I`)).toBe(false)
+    expect(isValidPackageKey(`${'A'.repeat(127)}l`)).toBe(false)
   })
 
-  it('公钥与私钥组合后才是真正参与派生的口令', () => {
-    const first = composePackageSecret('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23', 'password-1')
-    const sameNormalized = composePackageSecret('23456789abcdefghjkmnpqrstvwxyz23', 'password-1')
-    const otherKey = composePackageSecret('ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ', 'password-1')
-    const otherPassword = composePackageSecret('2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23', 'password-2')
+  it('仍然接受早期 32 位公钥，保证旧包能导入', () => {
+    const legacy = '2345-6789-ABCD-EFGH-JKMN-PQRS-TVWX-YZ23'
+    expect(LEGACY_PACKAGE_KEY_LENGTH).toBe(32)
+    expect(isValidPackageKey(legacy)).toBe(true)
+  })
+
+  it('公钥与私钥组合后才是真正参与派生的口令，大小写不同即不同', () => {
+    const key = `${PACKAGE_KEY_ALPHABET}`.repeat(3).slice(0, 128)
+    const first = composePackageSecret(key, 'password-1')
+    const sameNormalized = composePackageSecret(formatPackageKey(key), 'password-1')
+    const otherCase = composePackageSecret(key.toUpperCase(), 'password-1')
+    const otherPassword = composePackageSecret(key, 'password-2')
     expect(first).toBe(sameNormalized)
-    expect(first).not.toBe(otherKey)
+    expect(first).not.toBe(otherCase)
     expect(first).not.toBe(otherPassword)
   })
 })

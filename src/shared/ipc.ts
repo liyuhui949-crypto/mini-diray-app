@@ -205,7 +205,7 @@ export const requestValidators: RequestValidators = {
       .parse(payload) as IpcContract['dialog:openFile']['req'],
   'migration:export': (payload) =>
     z
-      .object({ packagePassword: passwordSchema, packageKey: z.string().min(20).max(80) })
+      .object({ packagePassword: passwordSchema, packageKey: z.string().min(20).max(200) })
       .parse(payload) as IpcContract['migration:export']['req'],
   'migration:inspect': (payload) =>
     z.object({ filePath: optionalString }).parse(payload) as IpcContract['migration:inspect']['req'],
@@ -214,7 +214,7 @@ export const requestValidators: RequestValidators = {
       .object({
         filePath: optionalString,
         packagePassword: z.string().min(1).max(200),
-        packageKey: z.string().max(80).optional()
+        packageKey: z.string().max(200).optional()
       })
       .parse(payload) as IpcContract['migration:preview']['req'],
   'migration:import': (payload) =>

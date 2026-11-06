@@ -330,7 +330,7 @@ export const copy = {
     exportStart: '开始导出',
     keyTitle: '公钥已生成',
     keyDescription:
-      '公钥只在这里显示，应用不会保存它。请立刻复制并单独保存：没有它，这个包永远打不开。',
+      '公钥只在这里显示，应用不会保存它。请立刻复制并单独保存：没有它，这个包永远打不开。公钥区分大小写。',
     keyLabel: '公钥',
     copyKey: '复制公钥',
     keyCopied: '已复制',
@@ -339,9 +339,10 @@ export const copy = {
     keyWarning: '不要和迁移包放在一起，否则等于没有这道防线。',
     keyDoneHint: '公钥可以再次复制；关掉这个窗口后就不再显示。',
     packageKeyLabel: '公钥',
-    packageKeyPlaceholder: 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
-    packageKeyHint: '导出时生成的那串字符，可以带或不带短横线，大小写不敏感。',
-    packageKeyInvalid: '公钥格式不正确（应为 32 位字母数字）',
+    packageKeyPlaceholder: '粘贴 128 位公钥（区分大小写）',
+    packageKeyHint:
+      '导出时生成的那串字符（128 位，区分大小写），可以带或不带短横线，建议整段粘贴。',
+    packageKeyInvalid: '公钥格式不正确（应为 128 位字母数字）',
     legacyPackageHint: '这是旧格式迁移包，只需要私钥（包密码）。',
     inspectRequiresKey: '这个包需要公钥才能打开。',
     exportPreparing: '准备中…',

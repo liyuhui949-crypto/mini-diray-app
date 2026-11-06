@@ -67,7 +67,7 @@ test('导出迁移包再导入到全新安装', async () => {
     await page.getByRole('button', { name: '生成公钥' }).click()
     await expect(page.locator('#package-key')).toBeVisible()
     packageKey = (await page.locator('#package-key').textContent())?.trim() ?? ''
-    expect(packageKey).toMatch(/^[0-9A-Z-]{39}$/)
+    expect(packageKey).toMatch(/^[0-9A-Za-z-]{159}$/)
     // 生成公钥后有 5 秒冷静期，倒计时结束才能导出
     await expect(page.getByRole('button', { name: '开始导出' })).toBeEnabled({ timeout: 15_000 })
     await page.getByRole('button', { name: '开始导出' }).click()

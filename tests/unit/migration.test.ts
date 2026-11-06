@@ -17,7 +17,7 @@ const FAST = { N: 1024, r: 8, p: 1 }
 const PASSWORD = 'source-password-1234'
 const PACKAGE_PASSWORD = 'package-password-1234'
 /** 32 位、只含公钥字母表字符 */
-const PACKAGE_KEY = 'ABCD-EFGH-JKMN-PQRS-TVWX-YZ23-4567-89AB'
+const PACKAGE_KEY = ('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789').repeat(3).slice(0, 128)
 
 const PNG = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
@@ -206,7 +206,7 @@ describe('迁移包 roundtrip', () => {
         code: 'PACKAGE_KEY_REQUIRED'
       })
       await expect(
-        importer.preview(packagePath, PACKAGE_PASSWORD, 'ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ')
+        importer.preview(packagePath, PACKAGE_PASSWORD, 'Z'.repeat(128))
       ).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
       await expect(importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)).resolves.toBeTruthy()
     } finally {

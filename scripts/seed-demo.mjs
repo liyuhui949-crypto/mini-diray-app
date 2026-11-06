@@ -21,8 +21,9 @@ const KEY_PATH = path.resolve('demo/40-days.key.txt')
 const VAULT_PASSWORD = 'seed-vault-2026'
 
 // 与 src/shared/packageKey.ts 保持一致的字母表（脚本是 .mjs，不能直接 import TS）
-const KEY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ'
-const KEY_LENGTH = 32
+const KEY_ALPHABET =
+  'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+const KEY_LENGTH = 128
 
 function generatePackageKey() {
   const limit = Math.floor(256 / KEY_ALPHABET.length) * KEY_ALPHABET.length

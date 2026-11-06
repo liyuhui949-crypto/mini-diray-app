@@ -52,13 +52,16 @@
 
 .keyValue {
   display: block;
+  max-height: 168px;
+  overflow: auto;
   font-family: var(--md-font-mono);
-  font-size: 15px;
-  letter-spacing: 0.08em;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
   color: var(--md-accent);
   word-break: break-all;
-  line-height: 1.6;
+  line-height: 1.75;
   user-select: all;
+  padding-right: 4px;
 }
 
 .keyWarning {
