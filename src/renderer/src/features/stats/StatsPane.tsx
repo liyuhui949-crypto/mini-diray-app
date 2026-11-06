@@ -7,17 +7,15 @@ import type { StorageStats } from '@shared/types'
 
 import { call } from '@/api/client'
 import { useEntriesStore } from '@/stores/entries'
-import { usePrefsStore } from '@/stores/prefs'
 
 import styles from './stats.module.scss'
 
 export function StatsPane(): React.JSX.Element {
   const entries = useEntriesStore((state) => state.entries)
-  const firstDayOfWeek = usePrefsStore((state) => state.prefs?.firstDayOfWeek ?? 1)
   const [storage, setStorage] = useState<StorageStats | null>(null)
 
   const today = todayLocalDate()
-  const options = useMemo(() => ({ today, firstDayOfWeek }), [today, firstDayOfWeek])
+  const options = useMemo(() => ({ today }), [today])
   const stats = useMemo(() => calcStats(entries, options), [entries, options])
   const weeks = useMemo(() => weeklyBuckets(entries, 12, options), [entries, options])
   const heat = useMemo(() => heatmapColumns(entries, 13, options), [entries, options])

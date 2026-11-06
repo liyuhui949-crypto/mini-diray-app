@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { copy } from '@shared/copy'
-import type { AutoLockMinutes, WeekdayIndex } from '@shared/types'
+import type { AutoLockMinutes } from '@shared/types'
 
 import { call, errorMessage } from '@/api/client'
 import { Button, Select, Switch } from '@/components/ui'
@@ -14,16 +14,6 @@ const THEME_OPTIONS = [
   { value: 'system', label: copy.preferences.themeSystem },
   { value: 'light', label: copy.preferences.themeLight },
   { value: 'dark', label: copy.preferences.themeDark }
-]
-
-const WEEKDAY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '0', label: copy.preferences.weekdaySunday },
-  { value: '1', label: copy.preferences.weekdayMonday },
-  { value: '2', label: copy.preferences.weekdayTuesday },
-  { value: '3', label: copy.preferences.weekdayWednesday },
-  { value: '4', label: copy.preferences.weekdayThursday },
-  { value: '5', label: copy.preferences.weekdayFriday },
-  { value: '6', label: copy.preferences.weekdaySaturday }
 ]
 
 const AUTO_LOCK_OPTIONS: Array<{ value: string; label: string }> = [
@@ -84,16 +74,6 @@ export function PreferencesPane(): React.JSX.Element {
             }}
           />
         </Setting>
-        <Setting title={copy.preferences.firstDayOfWeek} description={copy.preferences.firstDayDesc}>
-          <Select
-            value={String(prefs.firstDayOfWeek)}
-            aria-label={copy.preferences.firstDayOfWeek}
-            options={WEEKDAY_OPTIONS}
-            onChange={(event) => {
-              void update({ firstDayOfWeek: Number(event.target.value) as WeekdayIndex })
-            }}
-          />
-        </Setting>
       </section>
 
       <section className={styles.panel}>
@@ -104,15 +84,6 @@ export function PreferencesPane(): React.JSX.Element {
             checked={prefs.hideTitle}
             onChange={(checked) => {
               void update({ hideTitle: checked })
-            }}
-          />
-        </Setting>
-        <Setting title={copy.preferences.spellcheck} description={copy.preferences.spellcheckDesc}>
-          <Switch
-            label={copy.preferences.spellcheck}
-            checked={prefs.spellcheck}
-            onChange={(checked) => {
-              void update({ spellcheck: checked })
             }}
           />
         </Setting>
@@ -183,11 +154,6 @@ export function PreferencesPane(): React.JSX.Element {
         <Setting title={copy.preferences.cleanup} description={copy.preferences.cleanupDesc}>
           <Button size="sm" onClick={() => openDialog('cleanup')}>
             {copy.preferences.cleanupAction}
-          </Button>
-        </Setting>
-        <Setting title="从旧版 Mini Diary 导入" description="读取 3.3.0 的 mini-diary.txt（实验性）">
-          <Button size="sm" onClick={() => openDialog('legacyImport')}>
-            导入旧文件…
           </Button>
         </Setting>
       </section>

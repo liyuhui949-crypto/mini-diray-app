@@ -135,7 +135,7 @@ describe('统计', () => {
   ]
 
   it('六项指标口径与手算一致', () => {
-    const stats = calcStats(entries, { today, firstDayOfWeek: 1 })
+    const stats = calcStats(entries, { today })
     expect(stats.totalEntries).toBe(6)
     expect(stats.longestStreak).toBe(6)
     expect(stats.currentStreak).toBe(6)
@@ -153,14 +153,14 @@ describe('统计', () => {
       entry({ date: '2026-11-02', title: 'b' }),
       entry({ date: '2026-11-05', title: 'c' })
     ]
-    const stats = calcStats(broken, { today, firstDayOfWeek: 1 })
+    const stats = calcStats(broken, { today })
     expect(stats.longestStreak).toBe(2)
     // 今天没写，但昨天写了 → 当前连续 = 1
     expect(stats.currentStreak).toBe(1)
   })
 
   it('空库与未来条目不参与连续统计', () => {
-    expect(calcStats([], { today, firstDayOfWeek: 1 })).toMatchObject({
+    expect(calcStats([], { today })).toMatchObject({
       totalEntries: 0,
       longestStreak: 0,
       currentStreak: 0,
@@ -172,27 +172,27 @@ describe('统计', () => {
       entry({ date: '2026-11-07', title: 'f' }),
       entry({ date: '2026-11-06', title: 't' })
     ]
-    const stats = calcStats(future, { today, firstDayOfWeek: 1 })
+    const stats = calcStats(future, { today })
     expect(stats.currentStreak).toBe(1)
   })
 
   it('只有空内容的条目不计数', () => {
     expect(hasContent(entry({ date: '2026-11-06' }))).toBe(false)
     expect(hasContent(entry({ date: '2026-11-06', tags: ['x'] }))).toBe(true)
-    expect(calcStats([entry({ date: '2026-11-06' })], { today, firstDayOfWeek: 1 }).totalEntries).toBe(
+    expect(calcStats([entry({ date: '2026-11-06' })], { today }).totalEntries).toBe(
       0
     )
   })
 
   it('近 12 周分桶与热力图列数正确', () => {
-    const weeks = weeklyBuckets(entries, 12, { today, firstDayOfWeek: 1 })
+    const weeks = weeklyBuckets(entries, 12, { today })
     expect(weeks).toHaveLength(12)
     // 本周（11-02 起）有 11-02 到 11-06 共 5 篇；11-01 属于上一周
     expect(weeks[11]?.count).toBe(5)
     expect(weeks[10]?.count).toBe(1)
     expect(weeks[0]?.count).toBe(0)
 
-    const heat = heatmapColumns(entries, 13, { today, firstDayOfWeek: 1 })
+    const heat = heatmapColumns(entries, 13, { today })
     expect(heat).toHaveLength(13)
     expect(heat[0]?.cells).toHaveLength(7)
     const last = heat[12]?.cells ?? []
@@ -299,10 +299,8 @@ describe('Schema 与标签规范化', () => {
     const prefs = {
       version: 1,
       theme: 'system',
-      firstDayOfWeek: 1,
       hideTitle: false,
       allowFutureEntries: false,
-      spellcheck: true,
       autoLockMinutes: 0,
       diaryDir: '/tmp/diary',
       lastOpenedDate: null,
@@ -311,7 +309,7 @@ describe('Schema 与标签规范化', () => {
     }
     expect(preferencesSchema.safeParse(prefs).success).toBe(true)
     expect(preferencesSchema.safeParse({ ...prefs, theme: 'neon' }).success).toBe(false)
-    expect(preferencesSchema.safeParse({ ...prefs, firstDayOfWeek: 9 }).success).toBe(false)
+    expect(preferencesSchema.safeParse({ ...prefs, autoLockMinutes: 7 }).success).toBe(false)
   })
 
   it('日期校验拒绝 2 月 30 日', () => {

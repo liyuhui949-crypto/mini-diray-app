@@ -177,7 +177,6 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
             today={today}
             selected={activeDate}
             entries={entries}
-            firstDayOfWeek={prefs?.firstDayOfWeek ?? 1}
             allowFutureEntries={prefs?.allowFutureEntries ?? false}
             onCursorChange={setCalendarMonth}
             onSelect={(date) => {

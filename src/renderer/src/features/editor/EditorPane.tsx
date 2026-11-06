@@ -58,7 +58,6 @@ export function EditorPane(): React.JSX.Element {
 
   const readOnly = Boolean(prefs && !prefs.allowFutureEntries && activeDate > today)
   const allowFuture = prefs?.allowFutureEntries ?? false
-  const spellcheck = prefs?.spellcheck ?? true
 
   // 只重置「这一天是否已开始写」，预览/源码模式按用户习惯跨日记保留
   useEffect(() => {
@@ -314,7 +313,6 @@ export function EditorPane(): React.JSX.Element {
                   <CodeMirrorEditor
                     value={draft.body}
                     onChange={(body) => updateDraft({ body })}
-                    spellcheck={spellcheck}
                     placeholderText={copy.editor.emptyStatePlaceholder}
                     handleRef={editorRef}
                   />

@@ -1,4 +1,4 @@
-import { ExportDialog, ImportDialog, LegacyImportDialog } from '@/features/import-export/ExternalDialogs'
+import { ExportDialog, ImportDialog } from '@/features/import-export/ExternalDialogs'
 import { MigrationExportDialog } from '@/features/migration/MigrationExportDialog'
 import { MigrationImportDialog } from '@/features/migration/MigrationImportDialog'
 import {
@@ -23,7 +23,6 @@ export function Dialogs(): React.JSX.Element {
       <MigrationImportDialog open={dialog === 'migrationImport'} onClose={close} />
       <ImportDialog open={dialog === 'import'} onClose={close} />
       <ExportDialog open={dialog === 'export'} onClose={close} />
-      <LegacyImportDialog open={dialog === 'legacyImport'} onClose={close} />
     </>
   )
 }

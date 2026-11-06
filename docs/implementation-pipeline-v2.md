@@ -1589,7 +1589,17 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
    （它们仍被保留下来的条目引用）。代价是附件安装与 vault 切换不在同一个 rename 里，
    但顺序是"先附件、后 vault"，最坏情况只是多出几个未被引用的文件，不影响一致性。
 
-### 15.4 已修复问题
+### 15.4 需求范围调整（ADR 0002）
+
+按产品负责人要求移除三项不需要的能力，对应需求矩阵 **C7 / D10 / P2 / P5 / F8** 不再实现：
+
+| 移除项 | 影响 |
+|---|---|
+| 自定义每周第一天 | 日历与统计固定周一开头；`Preferences` / `prefs.json` 去掉 `firstDayOfWeek`；旧偏好文件与旧迁移包自动忽略该字段 |
+| 拼写检查开关 | 删除偏好、session 配置与编辑器开关；`spellcheck` 固定关闭 |
+| 旧版 Mini Diary 导入 | 删除 `vault/legacy.ts`、`legacy:*` IPC、设置入口与对话框；旧数据改走「导入 Mini Diary JSON」 |
+
+### 15.5 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|

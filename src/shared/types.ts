@@ -60,19 +60,14 @@ export type VaultStatus = 'missing' | 'locked' | 'unlocked'
 
 export type ThemeMode = 'system' | 'light' | 'dark'
 
-/** 0 = 周日 */
-export type WeekdayIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6
-
 /** 0 = 关闭空闲自动锁定 */
 export type AutoLockMinutes = 0 | 5 | 15 | 30 | 60
 
 export interface Preferences {
   version: 1
   theme: ThemeMode
-  firstDayOfWeek: WeekdayIndex
   hideTitle: boolean
   allowFutureEntries: boolean
-  spellcheck: boolean
   autoLockMinutes: AutoLockMinutes
   /** 当前日记库目录（绝对路径）；仅本机有效，不写入迁移包 */
   diaryDir: string
@@ -84,7 +79,7 @@ export interface Preferences {
 /** 迁移包内可移植的偏好子集（不含机器相关字段） */
 export type PortablePreferences = Pick<
   Preferences,
-  'theme' | 'firstDayOfWeek' | 'hideTitle' | 'allowFutureEntries' | 'spellcheck' | 'autoLockMinutes'
+  'theme' | 'hideTitle' | 'allowFutureEntries' | 'autoLockMinutes'
 >
 
 export type ImportFormat = 'dayOneJson' | 'jrnlJson' | 'miniDiaryJson' | 'dayOneTxt'

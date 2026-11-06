@@ -1,4 +1,4 @@
-import type { LocalDate, WeekdayIndex } from './types'
+import type { LocalDate } from './types'
 
 const WEEKDAY_CN = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const
 const WEEKDAY_SHORT_CN = ['日', '一', '二', '三', '四', '五', '六'] as const
@@ -73,10 +73,10 @@ export function startOfIsoWeek(value: LocalDate): LocalDate {
   return addDays(value, -offset)
 }
 
-/** 以给定周起始日计算所在周的第一天 */
-export function startOfWeek(value: LocalDate, firstDayOfWeek: WeekdayIndex): LocalDate {
+/** 所在周的第一天（固定周一，日历与统计共用同一口径） */
+export function startOfWeek(value: LocalDate): LocalDate {
   const date = parseLocalDate(value)
-  const offset = (date.getDay() - firstDayOfWeek + 7) % 7
+  const offset = (date.getDay() + 6) % 7
   return addDays(value, -offset)
 }
 
@@ -165,16 +165,12 @@ export interface CalendarCell {
 }
 
 /** 6×7 月历网格，固定 42 格 */
-export function buildCalendarGrid(
-  cursor: LocalDate,
-  firstDayOfWeek: WeekdayIndex,
-  today: LocalDate
-): CalendarCell[] {
+export function buildCalendarGrid(cursor: LocalDate, today: LocalDate): CalendarCell[] {
   const cursorDate = parseLocalDate(cursor)
   const year = cursorDate.getFullYear()
   const month = cursorDate.getMonth()
   const first = new Date(year, month, 1)
-  const offset = (first.getDay() - firstDayOfWeek + 7) % 7
+  const offset = (first.getDay() + 6) % 7
   const cells: CalendarCell[] = []
   for (let i = 0; i < 42; i++) {
     const date = new Date(year, month, 1 - offset + i)
@@ -206,11 +202,11 @@ export function weekdayOf(value: LocalDate): number {
   return parseLocalDate(value).getDay()
 }
 
-/** 中文星期表，按给定周起始日轮转 */
-export function weekdayHeadersCN(firstDayOfWeek: WeekdayIndex): string[] {
+/** 中文星期表（周一开始） */
+export function weekdayHeadersCN(): string[] {
   const result: string[] = []
   for (let i = 0; i < 7; i++) {
-    result.push(weekdayShortCN(firstDayOfWeek + i))
+    result.push(weekdayShortCN(1 + i))
   }
   return result
 }

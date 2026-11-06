@@ -22,10 +22,8 @@ export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
   return {
     version: 1,
     theme: 'system',
-    firstDayOfWeek: 1,
     hideTitle: false,
     allowFutureEntries: false,
-    spellcheck: true,
     autoLockMinutes: 0,
     diaryDir,
     lastOpenedDate: null,

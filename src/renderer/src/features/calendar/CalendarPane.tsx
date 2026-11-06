@@ -14,7 +14,7 @@ import {
   weekdayOf
 } from '@shared/date'
 import { hasContent } from '@shared/stats'
-import type { DiaryEntry, LocalDate, WeekdayIndex } from '@shared/types'
+import type { DiaryEntry, LocalDate } from '@shared/types'
 
 import { IconButton } from '@/components/ui'
 
@@ -25,7 +25,6 @@ interface CalendarPaneProps {
   today: LocalDate
   selected: LocalDate
   entries: readonly DiaryEntry[]
-  firstDayOfWeek: WeekdayIndex
   allowFutureEntries: boolean
   onCursorChange: (date: LocalDate) => void
   onSelect: (date: LocalDate) => void
@@ -36,16 +35,12 @@ export function CalendarPane({
   today,
   selected,
   entries,
-  firstDayOfWeek,
   allowFutureEntries,
   onCursorChange,
   onSelect
 }: CalendarPaneProps): React.JSX.Element {
   const gridRef = useRef<HTMLDivElement | null>(null)
-  const cells = useMemo(
-    () => buildCalendarGrid(cursor, firstDayOfWeek, today),
-    [cursor, firstDayOfWeek, today]
-  )
+  const cells = useMemo(() => buildCalendarGrid(cursor, today), [cursor, today])
   const datesWithContent = useMemo(() => {
     const set = new Set<LocalDate>()
     for (const entry of entries) {
@@ -54,7 +49,7 @@ export function CalendarPane({
     return set
   }, [entries])
 
-  const headers = weekdayHeadersCN(firstDayOfWeek)
+  const headers = weekdayHeadersCN()
 
   useEffect(() => {
     const active = gridRef.current?.querySelector<HTMLButtonElement>('[data-active="true"]')
@@ -102,11 +97,11 @@ export function CalendarPane({
         return
       case 'Home':
         event.preventDefault()
-        step(-((weekdayOf(date) - firstDayOfWeek + 7) % 7))
+        step(-((weekdayOf(date) + 6) % 7))
         return
       case 'End':
         event.preventDefault()
-        step(6 - ((weekdayOf(date) - firstDayOfWeek + 7) % 7))
+        step(6 - ((weekdayOf(date) + 6) % 7))
         return
       case 'Enter':
       case ' ':

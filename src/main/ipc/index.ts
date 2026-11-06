@@ -30,13 +30,9 @@ import { jobs } from '../jobs'
 import { logger } from '../logger'
 import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
-import { applySpellcheck } from '../spellcheck'
 import { checkForUpdates } from '../updater'
-import { LegacyImporter } from '../vault/legacy'
 import { ensureVaultDirs, vaultPaths } from '../vault/paths'
 import { isTrustedWebContents } from '../window'
-
-const legacyImporter = new LegacyImporter()
 
 function resolveTheme(context: AppContext): ThemeSource {
   const { theme } = context.preferences.current
@@ -149,9 +145,7 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   register('vault:unlock', async ({ password }) => {
-    const snapshot = await repository.unlock(password)
-    applySpellcheck(preferences.current.spellcheck)
-    return snapshot
+    return repository.unlock(password)
   })
 
   register('vault:snapshot', async () => repository.getSnapshot())
@@ -283,7 +277,6 @@ export function registerIpcHandlers(context: AppContext): void {
     if (patch.diaryDir) throw new AppError('INVALID_INPUT', '目录变更请使用迁移流程')
     const previous = preferences.current
     const next = await preferences.update(patch)
-    if (previous.spellcheck !== next.spellcheck) applySpellcheck(next.spellcheck)
     broadcast(EVENTS.prefsChanged, next)
     if (previous.theme !== next.theme) {
       broadcast(EVENTS.themeChanged, { theme: resolveTheme(context), source: 'preference' })
@@ -354,13 +347,10 @@ export function registerIpcHandlers(context: AppContext): void {
       if (result.prefs) {
         const next = await preferences.update({
           theme: result.prefs.theme,
-          firstDayOfWeek: result.prefs.firstDayOfWeek,
           hideTitle: result.prefs.hideTitle,
           allowFutureEntries: result.prefs.allowFutureEntries,
-          spellcheck: result.prefs.spellcheck,
           autoLockMinutes: result.prefs.autoLockMinutes
         })
-        applySpellcheck(next.spellcheck)
         broadcast(EVENTS.prefsChanged, next)
       }
       return {
@@ -466,16 +456,6 @@ export function registerIpcHandlers(context: AppContext): void {
     }
   })
 
-  // ───────────────────────── legacy migration ─────────────────────────
-  register('legacy:importPreview', async ({ filePath, password }) =>
-    legacyImporter.preview(filePath, password)
-  )
-
-  register('legacy:commit', async ({ token }) => {
-    const entries = legacyImporter.take(token).map((entry) => ({ ...entry, attachments: [] }))
-    const result = await repository.upsertEntries(entries)
-    return { revision: result.revision, entries: result.added + result.merged }
-  })
 }
 
 function importFilters(format?: ImportFormat): Array<{ name: string; extensions: string[] }> {

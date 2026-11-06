@@ -35,10 +35,8 @@ export interface MigrationExportOptions {
 function portablePrefs(prefs: Preferences): PortablePreferences {
   return {
     theme: prefs.theme,
-    firstDayOfWeek: prefs.firstDayOfWeek,
     hideTitle: prefs.hideTitle,
     allowFutureEntries: prefs.allowFutureEntries,
-    spellcheck: prefs.spellcheck,
     autoLockMinutes: prefs.autoLockMinutes
   }
 }

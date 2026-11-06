@@ -60,7 +60,7 @@ export function createMainWindow(preferences: Preferences): BrowserWindow {
       webviewTag: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      spellcheck: preferences.spellcheck,
+      spellcheck: false,
       devTools: isDev(),
       backgroundThrottling: !silent
     }

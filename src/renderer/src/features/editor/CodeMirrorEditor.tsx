@@ -25,7 +25,6 @@ interface CodeMirrorEditorProps {
   value: string
   onChange: (value: string) => void
   readOnly?: boolean
-  spellcheck?: boolean
   placeholderText?: string
   handleRef?: Ref<EditorHandle>
 }
@@ -52,16 +51,13 @@ const baseTheme = EditorView.theme({
 })
 
 const readOnlyCompartment = new Compartment()
-const spellcheckCompartment = new Compartment()
 const placeholderCompartment = new Compartment()
 
-function contentAttributes(spellcheck: boolean): Extension {
-  return EditorView.contentAttributes.of({
-    spellcheck: spellcheck ? 'true' : 'false',
-    autocorrect: 'off',
-    autocapitalize: 'off'
-  })
-}
+const contentAttributes: Extension = EditorView.contentAttributes.of({
+  spellcheck: 'false',
+  autocorrect: 'off',
+  autocapitalize: 'off'
+})
 
 function selectionEdit(view: EditorView): { text: string; selectionStart: number; selectionEnd: number } {
   const selection = view.state.selection.main
@@ -91,7 +87,6 @@ export function CodeMirrorEditor({
   value,
   onChange,
   readOnly = false,
-  spellcheck = true,
   placeholderText = '',
   handleRef
 }: CodeMirrorEditorProps): React.JSX.Element {
@@ -113,7 +108,7 @@ export function CodeMirrorEditor({
       baseTheme,
       EditorView.lineWrapping,
       readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
-      spellcheckCompartment.of(contentAttributes(spellcheck)),
+      contentAttributes,
       placeholderCompartment.of(placeholderText ? placeholderExtension(placeholderText) : []),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return
@@ -187,14 +182,6 @@ export function CodeMirrorEditor({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly))
     })
   }, [readOnly])
-
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    view.dispatch({
-      effects: spellcheckCompartment.reconfigure(contentAttributes(spellcheck))
-    })
-  }, [spellcheck])
 
   useEffect(() => {
     const view = viewRef.current

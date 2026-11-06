@@ -1,4 +1,4 @@
-import type { DiaryEntry, LocalDate, WeekdayIndex } from './types'
+import type { DiaryEntry, LocalDate } from './types'
 import { addDays, daysBetween, parseLocalDate, startOfWeek, toLocalDate } from './date'
 import { countEntryWords } from './words'
 
@@ -15,7 +15,6 @@ export interface DiaryStats {
 
 export interface StatsOptions {
   today: LocalDate
-  firstDayOfWeek: WeekdayIndex
 }
 
 export function hasContent(entry: DiaryEntry): boolean {
@@ -83,8 +82,8 @@ export function calcStats(entries: readonly DiaryEntry[], options: StatsOptions)
 
   let perWeek = 0
   if (firstDate) {
-    const firstWeekStart = startOfWeek(firstDate, options.firstDayOfWeek)
-    const currentWeekStart = startOfWeek(options.today, options.firstDayOfWeek)
+    const firstWeekStart = startOfWeek(firstDate)
+    const currentWeekStart = startOfWeek(options.today)
     const weeks = Math.floor(daysBetween(firstWeekStart, currentWeekStart) / 7) + 1
     perWeek = totalEntries / Math.max(1, weeks)
   }
@@ -114,7 +113,7 @@ export function weeklyBuckets(
   weeks: number,
   options: StatsOptions
 ): WeeklyBucket[] {
-  const currentWeekStart = startOfWeek(options.today, options.firstDayOfWeek)
+  const currentWeekStart = startOfWeek(options.today)
   const buckets: WeeklyBucket[] = []
   const index = new Map<LocalDate, WeeklyBucket>()
   for (let i = weeks - 1; i >= 0; i--) {
@@ -126,7 +125,7 @@ export function weeklyBuckets(
   for (const entry of entries) {
     if (!hasContent(entry)) continue
     if (entry.date > options.today) continue
-    const weekStart = startOfWeek(entry.date, options.firstDayOfWeek)
+    const weekStart = startOfWeek(entry.date)
     const bucket = index.get(weekStart)
     if (!bucket) continue
     bucket.count += 1
@@ -162,7 +161,7 @@ export function heatmapColumns(
   weeks: number,
   options: StatsOptions
 ): HeatColumn[] {
-  const currentWeekStart = startOfWeek(options.today, options.firstDayOfWeek)
+  const currentWeekStart = startOfWeek(options.today)
   const byDate = new Map<LocalDate, { count: number; words: number }>()
   for (const entry of entries) {
     if (!hasContent(entry)) continue

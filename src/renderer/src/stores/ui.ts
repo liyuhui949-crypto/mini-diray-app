@@ -16,7 +16,6 @@ export type DialogName =
   | 'import'
   | 'export'
   | 'cleanup'
-  | 'legacyImport'
   | null
 
 export interface ToastAction {

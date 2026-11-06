@@ -51,17 +51,19 @@ describe('本地日期', () => {
     expect(daysBetween('2026-03-01', '2026-01-01')).toBe(-59)
   })
 
-  it('周起始可配置', () => {
+  it('周起始固定为周一', () => {
     // 2026-11-06 是周五
     expect(weekdayOf('2026-11-06')).toBe(5)
-    expect(startOfWeek('2026-11-06', 1)).toBe('2026-11-02')
-    expect(startOfWeek('2026-11-06', 0)).toBe('2026-11-01')
-    expect(startOfWeek('2026-11-06', 5)).toBe('2026-11-06')
-    expect(weekdayHeadersCN(1)).toEqual(['一', '二', '三', '四', '五', '六', '日'])
+    expect(startOfWeek('2026-11-06')).toBe('2026-11-02')
+    // 周一自己就是一周的第一天
+    expect(startOfWeek('2026-11-02')).toBe('2026-11-02')
+    // 周日归到前一个周一
+    expect(startOfWeek('2026-11-01')).toBe('2026-10-26')
+    expect(weekdayHeadersCN()).toEqual(['一', '二', '三', '四', '五', '六', '日'])
   })
 
   it('月历固定 42 格并标记跨月与今天', () => {
-    const grid = buildCalendarGrid('2026-11-01', 1, '2026-11-06')
+    const grid = buildCalendarGrid('2026-11-01', '2026-11-06')
     expect(grid).toHaveLength(42)
     expect(grid[0]?.date).toBe('2026-10-26')
     expect(grid.filter((cell) => cell.inMonth)).toHaveLength(30)
@@ -70,7 +72,7 @@ describe('本地日期', () => {
   })
 
   it('闰年二月与跨年切月', () => {
-    const grid = buildCalendarGrid('2024-02-01', 1, '2024-02-10')
+    const grid = buildCalendarGrid('2024-02-01', '2024-02-10')
     expect(grid.filter((cell) => cell.inMonth)).toHaveLength(29)
     expect(shiftMonth('2026-01-15', -1)).toBe('2025-12-01')
     expect(shiftMonth('2026-12-31', 1)).toBe('2027-01-01')

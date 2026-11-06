@@ -35,7 +35,6 @@ function renderCalendar(overrides: Partial<React.ComponentProps<typeof CalendarP
     today: '2026-11-06',
     selected: '2026-11-06',
     entries,
-    firstDayOfWeek: 1 as const,
     allowFutureEntries: false,
     onCursorChange: vi.fn(),
     onSelect: vi.fn(),

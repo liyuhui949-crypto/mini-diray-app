@@ -140,13 +140,6 @@ export interface IpcContract {
   }
 
   'stats:storage': { req: void; res: StorageStats }
-
-  /** 旧版 mini-diary.txt 一次性迁移（实验性） */
-  'legacy:importPreview': {
-    req: { filePath: string; password: string }
-    res: { token: string; entries: number; firstDate: string | null; lastDate: string | null }
-  }
-  'legacy:commit': { req: { token: string }; res: { revision: number; entries: number } }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -237,12 +230,6 @@ export const requestValidators: RequestValidators = {
       .parse(payload) as IpcContract['export:run']['req'],
   'shell:openExternal': (payload) =>
     z.object({ url: z.string().url().startsWith('https:') }).parse(payload) as IpcContract['shell:openExternal']['req'],
-  'legacy:importPreview': (payload) =>
-    z
-      .object({ filePath: optionalString, password: z.string().min(1).max(200) })
-      .parse(payload) as IpcContract['legacy:importPreview']['req'],
-  'legacy:commit': (payload) =>
-    z.object({ token: z.string().min(1) }).parse(payload) as IpcContract['legacy:commit']['req']
 }
 
 /** 渲染进程可用的桥接 API（由 preload 通过 contextBridge 暴露） */

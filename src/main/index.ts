@@ -11,7 +11,6 @@ import { registerPrintScheme } from './export/pdf'
 import { registerIpcHandlers } from './ipc'
 import { initLogger, logger } from './logger'
 import { installApplicationMenu } from './menu'
-import { applySpellcheck, configureSpellcheckSession } from './spellcheck'
 import { createMainWindow } from './window'
 
 const DEV = !app.isPackaged
@@ -115,12 +114,10 @@ if (!singleInstance) {
 
   app.whenReady().then(async () => {
     initLogger(DEV)
-    configureSpellcheckSession()
     applyContentSecurityPolicy()
 
     context = new AppContext(app.getVersion())
     await context.init()
-    applySpellcheck(context.preferences.current.spellcheck)
 
     registerIpcHandlers(context)
     createMainWindow(context.preferences.current)

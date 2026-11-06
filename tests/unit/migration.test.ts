@@ -37,10 +37,8 @@ function preferences(diaryDir: string): Preferences {
   return {
     version: 1,
     theme: 'dark',
-    firstDayOfWeek: 1,
     hideTitle: false,
     allowFutureEntries: false,
-    spellcheck: true,
     autoLockMinutes: 0,
     diaryDir,
     lastOpenedDate: null,
