@@ -1,5 +1,11 @@
 // CodeMirror 6：把 Markdown 源码排成"像日记正文"的样子
 .cmEditor {
+  .cmHit {
+    background: var(--md-accent-soft);
+    border-radius: 2px;
+    box-shadow: inset 0 -1px 0 var(--md-accent);
+  }
+
   height: 100%;
 
   .cm-editor {

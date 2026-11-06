@@ -48,6 +48,10 @@ export function EditorPane(): React.JSX.Element {
 
   const preview = useUiStore((state) => state.previewMode)
   const setPreviewMode = useUiStore((state) => state.setPreviewMode)
+  const searchJump = useUiStore((state) => state.searchJump)
+  const [highlightQuery, setHighlightQuery] = useState<string | null>(null)
+  const [hitCount, setHitCount] = useState(0)
+  const appliedJump = useRef(0)
   const [started, setStarted] = useState(false)
   const [busyPath, setBusyPath] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -62,7 +66,18 @@ export function EditorPane(): React.JSX.Element {
   // 只重置「这一天是否已开始写」，预览/源码模式按用户习惯跨日记保留
   useEffect(() => {
     setStarted(false)
+    setHighlightQuery(null)
+    setHitCount(0)
   }, [activeDate])
+
+  // 「在日记中打开」：等这一天的草稿就位后再给编辑器下高亮指令
+  useEffect(() => {
+    if (!searchJump || !draft || draft.date !== searchJump.date) return
+    if (appliedJump.current === searchJump.seq) return
+    appliedJump.current = searchJump.seq
+    setPreviewMode(false)
+    setHighlightQuery(searchJump.query)
+  }, [searchJump, draft, setPreviewMode])
 
   useEffect(() => {
     if (attachmentRequestSeq > 0) void addFromDialog()
@@ -315,6 +330,12 @@ export function EditorPane(): React.JSX.Element {
                     onChange={(body) => updateDraft({ body })}
                     placeholderText={copy.editor.emptyStatePlaceholder}
                     handleRef={editorRef}
+                    highlightQuery={highlightQuery}
+                    onHighlightCount={(count) => {
+                      setHitCount(count)
+                      // 用户一输入，命中高亮与状态栏计数一起撤掉
+                      if (count === 0) setHighlightQuery(null)
+                    }}
                   />
                 </div>
               )}
@@ -359,6 +380,12 @@ export function EditorPane(): React.JSX.Element {
 
       <div className={styles.statusbar}>
         <span>{copy.editor.wordCount(wordCount)}</span>
+        {highlightQuery && hitCount > 0 ? (
+          <>
+            <span className={styles.sep} />
+            <span className={styles.hitChip}>{copy.search.hitCount(hitCount)}</span>
+          </>
+        ) : null}
         <span className={styles.sep} />
         <span
           className={`${styles.saveState} ${saveState === 'dirty' ? styles.saveDirty : ''} ${
