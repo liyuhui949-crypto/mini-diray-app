@@ -123,9 +123,6 @@ export const copy = {
     results: (n: number) => `${n} 个结果`,
     total: (entries: number, words: number) => `${entries} 篇 · 共 ${words} 字`,
     newEntry: '新建',
-    /**
-     * 这个月还没有条目。选中日期就能开始写。
-     */
     empty: '这个月还没有日记。',
     emptySearch: (q: string) => `翻遍了，没有「${q}」。`,
     emptySearchHint: '换个词试试，或者清空标签筛选。',

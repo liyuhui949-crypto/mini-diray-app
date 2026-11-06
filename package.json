@@ -27,10 +27,10 @@
     "test:component": "vitest run tests/component",
     "test:e2e": "pnpm build && playwright test",
     "verify": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:component && pnpm build",
-    "package:dir": "pnpm build && electron-builder --dir",
-    "package:mac": "pnpm build && electron-builder --mac",
-    "package:win": "pnpm build && electron-builder --win",
-    "package:linux": "pnpm build && electron-builder --linux"
+    "package:dir": "pnpm build && node scripts/package-dir.mjs",
+    "package:mac": "pnpm build && node scripts/package-dir.mjs --mac",
+    "package:win": "pnpm build && node scripts/package-dir.mjs --win",
+    "package:linux": "pnpm build && node scripts/package-dir.mjs --linux"
   },
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.3.1",

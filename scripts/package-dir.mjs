@@ -1,5 +1,13 @@
-// electron-builder CLI 在 Node 24 下传参有问题，这里直接调 API 打一个未签名的 .app
+// electron-builder 26 的 CLI 在 Node 24 下会把自身路径当成参数（Unknown argument），
+// 这里直接调 API。用法：node scripts/package-dir.mjs [--dir|--mac|--win|--linux]
 import { build } from 'electron-builder'
 
-await build({ dir: true, publish: 'never' })
-console.log('packaged to release/')
+const mode = process.argv[2] ?? '--dir'
+const options = { publish: 'never' }
+if (mode === '--mac') options.mac = ['dmg', 'zip']
+else if (mode === '--win') options.win = ['nsis']
+else if (mode === '--linux') options.linux = ['AppImage', 'deb']
+else options.dir = true
+
+console.log(`[package] ${mode}  →  release/`)
+await build(options)
