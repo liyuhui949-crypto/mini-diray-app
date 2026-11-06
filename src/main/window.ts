@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { BrowserWindow, shell, type WebContents } from 'electron'
+import { BrowserWindow, app, shell, type WebContents } from 'electron'
 
 import { copy } from '@shared/copy'
 import type { Preferences } from '@shared/types'
@@ -31,13 +31,22 @@ function allowedOrigin(): string | null {
   }
 }
 
+/** 自动化测试用：窗口不在屏幕上出现，也不抢焦点 */
+function isSilent(): boolean {
+  return process.env['MINIDIARY_SILENT'] === '1'
+}
+
 export function createMainWindow(preferences: Preferences): BrowserWindow {
+  const silent = isSilent()
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
     minWidth: 960,
     minHeight: 620,
     show: false,
+    focusable: !silent,
+    skipTaskbar: silent,
+    paintWhenInitiallyHidden: true,
     title: copy.appName,
     backgroundColor: preferences.theme === 'dark' ? '#151513' : '#fbfbfa',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -52,14 +61,23 @@ export function createMainWindow(preferences: Preferences): BrowserWindow {
       webSecurity: true,
       allowRunningInsecureContent: false,
       spellcheck: preferences.spellcheck,
-      devTools: isDev()
+      devTools: isDev(),
+      backgroundThrottling: !silent
     }
   })
 
-  trusted.add(window.webContents.id)
-  window.on('closed', () => forgetWebContents(window.webContents))
+  const webContentsId = window.webContents.id
+  trusted.add(webContentsId)
+  window.on('closed', () => trusted.delete(webContentsId))
 
-  window.once('ready-to-show', () => window.show())
+  window.once('ready-to-show', () => {
+    if (silent) {
+      // 测试环境：只渲染不显示，避免打断用户
+      app.dock?.hide()
+      return
+    }
+    window.show()
+  })
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:')) {

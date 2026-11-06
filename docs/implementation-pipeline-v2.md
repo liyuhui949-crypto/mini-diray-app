@@ -1585,3 +1585,14 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 2. PDF 的 HTML 由渲染层用 `react-markdown` 生成，主进程再用 `sanitize-html` 二次清理（不引入 `marked`）；
 3. PDF 打印窗口通过内存 `print://` 协议取文档与字体，不写明文临时文件；
 4. 迁移导入的回滚用目录 rename（`migration/rollback-<jobId>/`），避免复制 2 GB 附件。
+5. `merge` 时不再整体替换 `attachments/` 目录：只把重新加密后的新附件逐个搬进现有目录，原有附件原地保留
+   （它们仍被保留下来的条目引用）。代价是附件安装与 vault 切换不在同一个 rename 里，
+   但顺序是"先附件、后 vault"，最坏情况只是多出几个未被引用的文件，不影响一致性。
+
+### 15.4 已修复问题
+
+| 问题 | 原因 | 处理 |
+|---|---|---|
+| 合并导入报"导入校验失败：附件不完整" | merge 把目标库原有附件也算进 staging 校验，且切换时整体替换 `attachments/` 会丢掉旧附件 | 校验只针对包内附件；merge 改为逐个搬入新附件、保留原目录（见 15.3-5） |
+| 失败后再次点"开始导入"提示"导入会话已过期" | 导入 token 是一次性的，失败后 UI 仍拿着旧 token | 失败后清空 token 并回到密码步骤，按钮改为"重新校验" |
+| 关闭窗口时日志出现 `Object has been destroyed` | `closed` 回调里访问已销毁的 `webContents` | 回调只捕获 id，不再访问对象 |

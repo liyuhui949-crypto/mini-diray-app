@@ -199,6 +199,7 @@ async function main() {
       env: {
         ...process.env,
         NODE_ENV: 'production',
+        MINIDIARY_SILENT: '1',
         MINIDIARY_USER_DATA: path.join(appHome, 'userdata'),
         MINIDIARY_DIARY_DIR: path.join(appHome, 'diary')
       }

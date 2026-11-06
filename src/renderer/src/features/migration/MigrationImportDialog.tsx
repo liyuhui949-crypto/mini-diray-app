@@ -109,7 +109,10 @@ export function MigrationImportDialog({
       pushToast(copy.migration.importDone)
     } catch (err) {
       setError(errorMessage(err))
-      setStep('mode')
+      // 导入用的 token 是一次性的：失败后必须重新校验，不能拿旧 token 再点一次
+      setToken(null)
+      setSummary(null)
+      setStep('password')
     }
   }
 
@@ -142,7 +145,7 @@ export function MigrationImportDialog({
         ) : step === 'mode' ? (
           <>
             <Button onClick={onClose}>{copy.common.cancel}</Button>
-            <Button variant="primary" onClick={() => void run()}>
+            <Button variant="primary" disabled={!token} onClick={() => void run()}>
               {copy.migration.importStart}
             </Button>
           </>
@@ -150,7 +153,7 @@ export function MigrationImportDialog({
           <>
             <Button onClick={onClose}>{copy.common.cancel}</Button>
             <Button variant="primary" onClick={() => void preview()} disabled={!filePath}>
-              {copy.common.next}
+              {error ? '重新校验' : copy.common.next}
             </Button>
           </>
         ) : (

@@ -1,8 +1,9 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
+
+import { createVault, fillInput, launchApp, makeHome, unlockVault } from './helpers'
 
 /**
  * 一键迁移的完整用户路径：
@@ -21,26 +22,15 @@ let appB: ElectronApplication | null = null
 let packagePath = ''
 
 async function launch(home: string): Promise<{ app: ElectronApplication; page: Page }> {
-  const app = await electron.launch({
-    args: ['.'],
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      MINIDIARY_USER_DATA: path.join(home, 'userdata'),
-      MINIDIARY_DIARY_DIR: path.join(home, 'diary')
-    }
-  })
-  const page = await app.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  return { app, page }
+  const launched = await launchApp(home)
+  return { app: launched.app, page: launched.page }
 }
 
 test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
-  homeA = await mkdtemp(path.join(tmpdir(), 'minidiary-mig-a-'))
-  homeB = await mkdtemp(path.join(tmpdir(), 'minidiary-mig-b-'))
+  homeA = await makeHome('minidiary-mig-a-')
+  homeB = await makeHome('minidiary-mig-b-')
   packagePath = path.join(homeA, 'bundle.minidiary')
 })
 
@@ -57,13 +47,11 @@ test('导出迁移包再导入到全新安装', async () => {
     const launched = await launch(homeA)
     appA = launched.app
     const page = launched.page
-    await page.fill('#new-password', PASSWORD)
-    await page.fill('#confirm-password', PASSWORD)
-    await page.click('button[type="submit"]')
+    await createVault(page, PASSWORD)
 
     await expect(page.getByText('这一天还没有字。')).toBeVisible()
     await page.getByRole('button', { name: '开始写' }).click()
-    await page.getByLabel('今天发生了什么？').fill('雨停之后')
+    await fillInput(page.getByLabel('今天发生了什么？'), '雨停之后')
     await page.locator('.cm-content').click()
     await page.keyboard.type('下午四点雨停了。')
     await expect(page.getByText(/已保存/)).toBeVisible({ timeout: 15_000 })
@@ -101,12 +89,12 @@ test('导出迁移包再导入到全新安装', async () => {
 
     await page.getByRole('button', { name: '选择文件…' }).first().click()
     await expect(page.locator('#import-password')).toBeVisible()
-    await page.locator('#import-password').fill(PACKAGE_PASSWORD)
+    await fillInput(page.locator('#import-password'), PACKAGE_PASSWORD)
     await page.getByRole('button', { name: '下一步' }).click()
 
     await expect(page.locator('#import-new')).toBeVisible({ timeout: 20_000 })
-    await page.locator('#import-new').fill(NEW_PASSWORD)
-    await page.locator('#import-new-confirm').fill(NEW_PASSWORD)
+    await fillInput(page.locator('#import-new'), NEW_PASSWORD)
+    await fillInput(page.locator('#import-new-confirm'), NEW_PASSWORD)
     await page.getByRole('button', { name: '开始导入' }).click()
 
     await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 60_000 })
@@ -116,8 +104,7 @@ test('导出迁移包再导入到全新安装', async () => {
     await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: '锁定' }).click()
     await expect(page.locator('#unlock-password')).toBeVisible()
-    await page.locator('#unlock-password').fill(NEW_PASSWORD)
-    await page.click('button[type="submit"]')
+    await unlockVault(page, NEW_PASSWORD)
     await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
   }
 })

@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
+
+import { createVault, fillInput, launchApp, makeHome, unlockVault } from './helpers'
 
 /**
  * 真实 Electron 端到端：建库 → 写作 → 搜索 → 附件（解密代理）→ 锁定/解锁 → 重启后仍在。
@@ -20,27 +21,15 @@ let app: ElectronApplication
 let page: Page
 
 async function launch(): Promise<void> {
-  app = await electron.launch({
-    args: ['.'],
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      MINIDIARY_USER_DATA: path.join(homeDir, 'userdata'),
-      MINIDIARY_DIARY_DIR: path.join(homeDir, 'diary')
-    }
-  })
-  page = await app.firstWindow()
-  page.on('pageerror', (error) => {
-    throw new Error(`渲染进程异常：${error.message}`)
-  })
-  await page.waitForLoadState('domcontentloaded')
+  const launched = await launchApp(homeDir)
+  app = launched.app
+  page = launched.page
 }
 
 test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
-  homeDir = await mkdtemp(path.join(tmpdir(), 'minidiary-e2e-'))
+  homeDir = await makeHome()
 })
 
 test.afterAll(async () => {
@@ -53,14 +42,12 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
 
   // 1. 引导页建库
   await expect(page.locator('#new-password')).toBeVisible()
-  await page.fill('#new-password', PASSWORD)
-  await page.fill('#confirm-password', PASSWORD)
-  await page.click('button[type="submit"]')
+  await createVault(page, PASSWORD)
 
   // 2. 写一篇
   await expect(page.getByText('这一天还没有字。')).toBeVisible()
   await page.getByRole('button', { name: '开始写' }).click()
-  await page.getByLabel('今天发生了什么？').fill('雨停之后')
+  await fillInput(page.getByLabel('今天发生了什么？'), '雨停之后')
   await page.locator('.cm-content').click()
   await page.keyboard.type('下午四点雨停了。')
   await page.keyboard.type('\n\n这几天一直在想**专注**这件事。')
@@ -137,18 +124,15 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   expect(lockedStatus).toBe(423)
 
   // 6. 错误密码 → 正确密码
-  await page.fill('#unlock-password', 'wrong-password')
-  await page.click('button[type="submit"]')
+  await unlockVault(page, 'wrong-password')
   await expect(page.getByText('密码错误或文件已损坏')).toBeVisible({ timeout: 15_000 })
-  await page.fill('#unlock-password', PASSWORD)
-  await page.click('button[type="submit"]')
+  await unlockVault(page, PASSWORD)
   await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
 
   // 7. 重启后仍在
   await app.close()
   await launch()
   await expect(page.locator('#unlock-password')).toBeVisible()
-  await page.fill('#unlock-password', PASSWORD)
-  await page.click('button[type="submit"]')
+  await unlockVault(page, PASSWORD)
   await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
 })

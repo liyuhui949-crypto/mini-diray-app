@@ -335,6 +335,67 @@ describe('迁移包 roundtrip', () => {
     }
   })
 
+  it('merge 进已有附件库：保留目标附件文件，包内附件换新 ID', async () => {
+    const source = await makeSource()
+    const pkgDir = await tempDir('minidiary-pkg-')
+    const packagePath = path.join(pkgDir, 'bundle.minidiary')
+    const targetDir = await tempDir('minidiary-dst-')
+    try {
+      await exportSource(source, packagePath)
+
+      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      await repo.create('target-password-1234')
+      const store = new AttachmentStore(targetDir, () => repo.getAttachmentKey())
+      const ownBytes = Buffer.concat([PNG, Buffer.from('我自己的图', 'utf8')])
+      const own = await store.addFromBytes({
+        name: '自己的图.png',
+        mime: 'image/png',
+        bytes: new Uint8Array(ownBytes)
+      })
+      await repo.saveEntry({
+        date: '2026-11-06',
+        title: '我的这天',
+        body: `我写的内容\n\n![自己的图](attachment://${own.id})`,
+        tags: ['本地'],
+        attachments: [own]
+      })
+      await repo.flush()
+
+      const importer = new MigrationImporter({ repository: repo, store, scrypt: FAST })
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD)
+      const result = await importer.run({
+        token: preview.token,
+        mode: 'merge',
+        newPassword: PASSWORD,
+        job: job('migration-import')
+      })
+      expect(result.merged).toBe(1)
+
+      const entry = repo.getSnapshot().entries.find((item) => item.date === '2026-11-06')
+      expect(entry?.attachments).toHaveLength(2)
+      const ownKept = entry?.attachments.find((item) => item.id === own.id)
+      expect(ownKept?.name).toBe('自己的图.png')
+      const imported = entry?.attachments.find((item) => item.id !== own.id)
+      expect(imported?.name).toBe('窗外的梧桐.png')
+
+      // 目标库原有附件文件没有被搬走/删除，包内附件是重新加密的新文件
+      expect(await store.verify(own)).toBe(true)
+      expect(await store.verify(imported!)).toBe(true)
+      expect(await store.listFiles()).toEqual(
+        expect.arrayContaining([`${own.id}.mdat`, `${imported!.id}.mdat`])
+      )
+
+      // 回滚目录已清理，库仍可正常解锁
+      expect(await stat(path.join(targetDir, 'migration')).then((info) => info.isDirectory())).toBe(true)
+      repo.lock()
+      await repo.unlock(PASSWORD)
+    } finally {
+      await rm(source.dir, { recursive: true, force: true })
+      await rm(pkgDir, { recursive: true, force: true })
+      await rm(targetDir, { recursive: true, force: true })
+    }
+  })
+
   it('引用的附件文件缺失时导出失败', async () => {
     const source = await makeSource()
     const pkgDir = await tempDir('minidiary-pkg-')

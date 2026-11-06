@@ -15,6 +15,7 @@ const app = await electron.launch({
     ...process.env,
     HOME: home,
     NODE_ENV: 'production',
+    MINIDIARY_SILENT: '1',
     MINIDIARY_USER_DATA: path.join(home, 'userdata'),
     MINIDIARY_DIARY_DIR: path.join(home, 'diary')
   }

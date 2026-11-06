@@ -357,21 +357,24 @@ export class MigrationImporter {
         if (verified.data.entries.length !== finalEntries.length) {
           throw new AppError('IO_ERROR', '导入校验失败：条目数量不一致')
         }
-        for (const entry of verified.data.entries) {
-          for (const attachment of entry.attachments) {
-            const filePath = path.join(staging.attachmentsDir, `${attachment.id}.mdat`)
-            const stats = await fs.stat(filePath).catch(() => null)
-            if (!stats || stats.size !== expectedMdatBytes(attachment.size, attachment.chunkSize)) {
-              throw new AppError('IO_ERROR', '导入校验失败：附件不完整')
-            }
+        verified.dek.fill(0)
+
+        // staging 里应当正好是「包内每个附件按映射后的 ID」一份。
+        // 合并模式下，目标库原有的附件仍留在原目录，不能被算进 staging 校验。
+        for (const attachment of record.attachments) {
+          const targetId = idMap.get(attachment.id.toLowerCase()) ?? attachment.id
+          const stats = await fs
+            .stat(path.join(staging.attachmentsDir, `${targetId}.mdat`))
+            .catch(() => null)
+          if (!stats || stats.size !== expectedMdatBytes(attachment.size, attachment.chunkSize)) {
+            throw new AppError('IO_ERROR', '导入校验失败：附件不完整')
           }
         }
-        verified.dek.fill(0)
 
         // 5. 原子切换
         job.report(0.97, '切换目录…')
         repository.lock()
-        const result = await switchStagingIntoPlace(repository.vaultDir, staging, job.id)
+        const result = await switchStagingIntoPlace(repository.vaultDir, staging, job.id, options.mode)
         rollbackDir = result.rollbackDir
         switched = true
 
@@ -410,6 +413,7 @@ export class MigrationImporter {
       }
       await cleanupStaging(staging).catch(() => undefined)
       if (error instanceof AppError) {
+        logger.warn('migration import failed', { code: error.code, message: error.message })
         job.fail(error.message)
         throw error
       }
