@@ -17,6 +17,9 @@ tmp-shots/
 logs/
 .DS_Store
 
+# 演示数据（体积大，本地生成；见 demo/README.md）
+demo/*.minidiary
+
 # local env
 .env
 .env.local
