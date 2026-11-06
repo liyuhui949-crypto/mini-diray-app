@@ -293,6 +293,8 @@ export class MigrationImporter {
             const result = await stagingStore.encryptFromReadable({
               id: targetId,
               size: attachment.size,
+              // 沿用包内的分块大小：否则元数据与重加密后的文件尺寸会对不上
+              chunkSize: attachment.chunkSize,
               source: decrypted,
               signal: job.signal
             })
