@@ -46,7 +46,8 @@ export function EditorPane(): React.JSX.Element {
   const attachmentRequestSeq = useUiStore((state) => state.attachmentRequestSeq)
   const today = useToday()
 
-  const [preview, setPreview] = useState(false)
+  const preview = useUiStore((state) => state.previewMode)
+  const setPreviewMode = useUiStore((state) => state.setPreviewMode)
   const [started, setStarted] = useState(false)
   const [busyPath, setBusyPath] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -59,8 +60,8 @@ export function EditorPane(): React.JSX.Element {
   const allowFuture = prefs?.allowFutureEntries ?? false
   const spellcheck = prefs?.spellcheck ?? true
 
+  // 只重置「这一天是否已开始写」，预览/源码模式按用户习惯跨日记保留
   useEffect(() => {
-    setPreview(false)
     setStarted(false)
   }, [activeDate])
 
@@ -94,7 +95,7 @@ export function EditorPane(): React.JSX.Element {
   const attachToEntry = (attachment: Attachment): void => {
     const store = useEntriesStore.getState()
     store.addAttachment(attachment)
-    if (preview) setPreview(false)
+    if (preview) setPreviewMode(false)
     window.setTimeout(() => {
       editorRef.current?.insertText(attachmentMarkdown(attachment))
       void useEntriesStore.getState().flush()
@@ -122,7 +123,6 @@ export function EditorPane(): React.JSX.Element {
     try {
       const attachment = await call('attachment:addFromDialog', undefined)
       if (!attachment) return
-      if (preview) setPreview(false)
       attachToEntry(attachment)
       pushToast(copy.attachments.uploadDone)
     } catch (error) {
@@ -219,7 +219,7 @@ export function EditorPane(): React.JSX.Element {
             <button
               type="button"
               className={`${styles.tool} ${preview ? styles.toolOn : ''}`}
-              onClick={() => setPreview(!preview)}
+              onClick={() => setPreviewMode(!preview)}
             >
               {preview ? <Code2 size={14} /> : <Eye size={14} />}
               {preview ? copy.editor.source : copy.editor.preview}
@@ -248,6 +248,8 @@ export function EditorPane(): React.JSX.Element {
               <Button
                 variant="primary"
                 onClick={() => {
+                  // 在预览模式下点「开始写」要回到源码，否则没有可输入的光标
+                  if (preview) setPreviewMode(false)
                   setStarted(true)
                   window.setTimeout(() => {
                     if (prefs?.hideTitle) editorRef.current?.focus()

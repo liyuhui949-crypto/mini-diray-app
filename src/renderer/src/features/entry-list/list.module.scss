@@ -12,12 +12,11 @@
 }
 
 .head {
-  height: 56px;
   flex: none;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px 0 16px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px 9px 16px;
   border-bottom: 1px solid var(--md-border-subtle);
 
   h2 {
@@ -27,10 +26,63 @@
   }
 }
 
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 18px;
+}
+
+.scope {
+  display: flex;
+  gap: 2px;
+  background: var(--md-bg-sunken);
+  border-radius: 6px;
+  padding: 1px;
+
+  button {
+    border: 0;
+    background: transparent;
+    color: var(--md-text-secondary);
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition:
+      background var(--md-dur),
+      color var(--md-dur);
+
+    &[aria-pressed='true'] {
+      background: var(--md-bg-surface);
+      color: var(--md-text-primary);
+      box-shadow: var(--md-shadow-1);
+    }
+
+    &:hover {
+      color: var(--md-text-primary);
+    }
+  }
+}
+
+.scopeHint {
+  font-size: 10.5px;
+  color: var(--md-text-tertiary);
+}
+
 .meta {
   font-size: 11.5px;
   color: var(--md-text-tertiary);
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .newBtn {

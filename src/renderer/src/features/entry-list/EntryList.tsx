@@ -4,7 +4,7 @@ import { Paperclip, Plus } from 'lucide-react'
 
 import { copy } from '@shared/copy'
 import { filterByTag, highlightSegments, searchEntries } from '@shared/search'
-import { formatMonthDayWithWeekdayCN, todayLocalDate } from '@shared/date'
+import { formatMonthDayWithWeekdayCN, monthOf, todayLocalDate } from '@shared/date'
 import type { DiaryEntry } from '@shared/types'
 import { countEntryWords, deriveTitle, makeSnippet } from '@shared/words'
 
@@ -13,6 +13,13 @@ import { usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 
 import styles from './list.module.scss'
+
+interface ListItem {
+  date: string
+  title: string
+  snippet: string
+  attachments: number
+}
 
 export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Element {
   const entries = useEntriesStore((state) => state.entries)
@@ -23,74 +30,129 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
   const setTag = useEntriesStore((state) => state.setTag)
   const prefs = usePrefsStore((state) => state.prefs)
   const setView = useUiStore((state) => state.setView)
+  const calendarMonth = useUiStore((state) => state.calendarMonth)
+  const listScope = useUiStore((state) => state.listScope)
+  const setListScope = useUiStore((state) => state.setListScope)
+
   const hideTitle = prefs?.hideTitle ?? false
+  const searching = query.trim().length > 0
+  const { year, month } = monthOf(calendarMonth)
 
-  const totalWords = useMemo(
-    () => entries.reduce((sum, entry) => sum + entry.wordCount, 0),
-    [entries]
-  )
+  const monthEntries = useMemo(() => {
+    const prefix = `${year}-${String(month).padStart(2, '0')}`
+    return entries.filter((entry) => entry.date.startsWith(prefix))
+  }, [entries, year, month])
 
-  const items = useMemo(() => {
-    const byDateDesc = (list: DiaryEntry[]): DiaryEntry[] =>
-      [...list].sort((a, b) => (a.date < b.date ? 1 : -1))
+  const scopedEntries = listScope === 'month' ? monthEntries : entries
 
-    if (query.trim()) {
+  const items = useMemo<ListItem[]>(() => {
+    const toDesc = (list: readonly DiaryEntry[]): ListItem[] =>
+      [...list]
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .map((entry) => ({
+          date: entry.date,
+          title: hideTitle
+            ? deriveTitle('', entry.body) || copy.list.untitled
+            : entry.title || copy.list.untitled,
+          snippet: makeSnippet(entry.body, entry.title),
+          attachments: entry.attachments.length
+        }))
+
+    // 搜索与标签是"全库"视图；只有普通列表跟随日历月份
+    if (searching) {
       return searchEntries(entries, query, { hideTitle }).map((hit) => ({
         date: hit.entry.date,
         title: hit.title || copy.list.untitled,
         snippet: hit.snippet,
-        attachments: hit.entry.attachments.length,
-        words: hit.entry.wordCount
+        attachments: hit.entry.attachments.length
       }))
     }
-    const base = byDateDesc(tag ? filterByTag(entries, tag) : entries)
-    return base.map((entry) => ({
-      date: entry.date,
-      title: hideTitle
-        ? deriveTitle('', entry.body) || copy.list.untitled
-        : entry.title || copy.list.untitled,
-      snippet: makeSnippet(entry.body, entry.title),
-      attachments: entry.attachments.length,
-      words: entry.wordCount || countEntryWords(entry.title, entry.body)
-    }))
-  }, [entries, query, tag, hideTitle])
+    if (tag) return toDesc(filterByTag(entries, tag))
+    return toDesc(scopedEntries)
+  }, [entries, searching, query, tag, hideTitle, scopedEntries])
 
-  const heading = query.trim() ? copy.list.searchResults : tag ? `${copy.list.tagPrefix} #${tag}` : copy.list.allEntries
+  const totalWords = useMemo(
+    () =>
+      (searching || tag ? entries : scopedEntries).reduce(
+        (sum, entry) => sum + (entry.wordCount || countEntryWords(entry.title, entry.body)),
+        0
+      ),
+    [entries, scopedEntries, searching, tag]
+  )
+
+  const heading = searching
+    ? copy.list.searchResults
+    : tag
+      ? `${copy.list.tagPrefix} #${tag}`
+      : listScope === 'month'
+        ? copy.list.monthTitle(year, month)
+        : copy.list.allEntries
+
+  const meta = searching
+    ? copy.list.results(items.length)
+    : listScope === 'month' && !tag
+      ? copy.list.monthMeta(items.length, totalWords)
+      : copy.list.total(items.length, totalWords)
+
+  const showScopeToggle = !searching && !tag
 
   return (
     <section className={styles.list} data-collapsed={collapsed} aria-hidden={collapsed}>
       <header className={styles.head}>
-        <div>
+        <div className={styles.headRow}>
           <h2>{heading}</h2>
-          <div className={styles.meta}>
-            {query.trim()
-              ? copy.list.results(items.length)
-              : copy.list.total(items.length, totalWords)}
-          </div>
+          <button
+            type="button"
+            className={styles.newBtn}
+            title={copy.list.newEntry}
+            onClick={() => {
+              setView('editor')
+              void openDate(todayLocalDate())
+            }}
+          >
+            <Plus size={14} /> {copy.list.newEntry}
+          </button>
         </div>
-        <button
-          type="button"
-          className={styles.newBtn}
-          title={copy.list.newEntry}
-          onClick={() => {
-            setView('editor')
-            void openDate(todayLocalDate())
-          }}
-        >
-          <Plus size={14} /> {copy.list.newEntry}
-        </button>
+        <div className={styles.metaRow}>
+          <span className={styles.meta}>{meta}</span>
+          {showScopeToggle ? (
+            <div className={styles.scope} role="group" aria-label={copy.list.scopeHint}>
+              <button
+                type="button"
+                aria-pressed={listScope === 'month'}
+                onClick={() => setListScope('month')}
+              >
+                {copy.list.scopeMonth}
+              </button>
+              <button
+                type="button"
+                aria-pressed={listScope === 'all'}
+                onClick={() => setListScope('all')}
+              >
+                {copy.list.scopeAll}
+              </button>
+            </div>
+          ) : (
+            <span className={styles.scopeHint}>{copy.list.allScopeHint}</span>
+          )}
+        </div>
       </header>
 
       <div className={styles.scroll}>
         {items.length === 0 ? (
           <div className={styles.empty}>
-            {query.trim() ? (
+            {searching ? (
               <>
                 <p>{copy.list.emptySearch(query.trim())}</p>
-                <p className={styles.emptyHint}>{copy.list.emptySearchHint}</p>
+                <p>{copy.list.emptySearchHint}</p>
               </>
+            ) : tag || listScope === 'all' ? (
+              <p>{copy.list.emptyAll}</p>
             ) : (
-              <p>{copy.list.empty}</p>
+              <>
+                <p>{copy.list.empty}</p>
+                <p>{copy.list.emptyMonthHint}</p>
+              </>
             )}
           </div>
         ) : (
@@ -153,4 +215,3 @@ function Highlighted({ text, query }: { text: string; query: string }): React.JS
     </>
   )
 }
-

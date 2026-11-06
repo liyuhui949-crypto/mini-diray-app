@@ -1,6 +1,11 @@
+import { todayLocalDate } from '@shared/date'
+import type { LocalDate } from '@shared/types'
 import { create } from 'zustand'
 
 export type ViewName = 'editor' | 'stats' | 'settings'
+
+/** 条目列表的取数范围：跟随日历月份，或展示全部 */
+export type ListScope = 'month' | 'all'
 
 export type DialogName =
   | 'changePassword'
@@ -35,10 +40,18 @@ interface UiState {
   listCollapsed: boolean
   lightboxId: string | null
   toasts: ToastItem[]
+  /** 编辑器预览模式：跨日记保留，切日期不重置 */
+  previewMode: boolean
+  /** 日历当前显示月份（每月 1 号） */
+  calendarMonth: LocalDate
+  listScope: ListScope
   focusSearchSeq: number
   attachmentRequestSeq: number
   pendingPackagePath: string | null
   setView: (view: ViewName) => void
+  setPreviewMode: (preview: boolean) => void
+  setCalendarMonth: (month: LocalDate) => void
+  setListScope: (scope: ListScope) => void
   openDialog: (dialog: Exclude<DialogName, null>) => void
   closeDialog: () => void
   toggleSidebar: () => void
@@ -59,10 +72,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   listCollapsed: false,
   lightboxId: null,
   toasts: [],
+  previewMode: false,
+  calendarMonth: todayLocalDate(),
+  listScope: 'month',
   focusSearchSeq: 0,
   attachmentRequestSeq: 0,
   pendingPackagePath: null,
   setView: (view) => set({ view, dialog: null }),
+  setPreviewMode: (previewMode) => set({ previewMode }),
+  setCalendarMonth: (calendarMonth) => set({ calendarMonth }),
+  setListScope: (listScope) => set({ listScope }),
   requestFocusSearch: () => set({ focusSearchSeq: get().focusSearchSeq + 1 }),
   requestAttachment: () => set({ attachmentRequestSeq: get().attachmentRequestSeq + 1 }),
   setPendingPackage: (pendingPackagePath) => set({ pendingPackagePath }),

@@ -67,7 +67,8 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   await page.getByLabel('搜索标题和正文').fill('专注')
   await expect(page.getByText('搜索结果')).toBeVisible()
   await page.getByLabel('搜索标题和正文').fill('')
-  await expect(page.getByText('全部条目')).toBeVisible()
+  // 列表默认跟随日历月份，清空搜索后回到当月视图
+  await expect(page.getByRole('heading', { name: '2026年11月' })).toBeVisible()
 
   // 4. 附件：把文件选择框替换成固定路径，走真实的流式加密写入
   const pngPath = path.join(homeDir, 'test.png')

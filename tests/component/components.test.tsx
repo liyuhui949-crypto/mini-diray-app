@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Attachment, DiaryEntry } from '@shared/types'
 
 import { CalendarPane } from '@/features/calendar/CalendarPane'
+import { EntryList } from '@/features/entry-list/EntryList'
 import { MarkdownPreview } from '@/features/editor/MarkdownPreview'
+import { useEntriesStore } from '@/stores/entries'
+import { useUiStore } from '@/stores/ui'
 import { TagEditor } from '@/features/editor/TagEditor'
 
 afterEach(() => {
@@ -170,5 +173,73 @@ describe('Markdown 预览', () => {
     const link = screen.getByText('外链').closest('a')
     expect(link).toHaveAttribute('href', 'https://example.com')
     expect(screen.getByText('坏链').closest('a')).toBeNull()
+  })
+})
+
+
+describe('条目列表范围', () => {
+  const october = {
+    date: '2026-10-05',
+    title: '十月的日记',
+    body: '十月正文',
+    tags: ['日常'],
+    attachments: [],
+    wordCount: 4,
+    createdAt: '2026-10-05T00:00:00.000Z',
+    updatedAt: '2026-10-05T00:00:00.000Z'
+  }
+  const november = {
+    date: '2026-11-06',
+    title: '十一月的日记',
+    body: '十一月正文',
+    tags: ['工作'],
+    attachments: [],
+    wordCount: 4,
+    createdAt: '2026-11-06T00:00:00.000Z',
+    updatedAt: '2026-11-06T00:00:00.000Z'
+  }
+
+  beforeEach(() => {
+    useEntriesStore.setState({
+      entries: [october, november],
+      activeDate: '2026-11-06',
+      searchQuery: '',
+      activeTag: null
+    })
+    useUiStore.setState({ calendarMonth: '2026-10-01', listScope: 'month' })
+  })
+
+  it('默认只显示日历当前月份的条目', () => {
+    render(<EntryList collapsed={false} />)
+    expect(screen.getByText('2026年10月')).toBeInTheDocument()
+    expect(screen.getByText('十月的日记')).toBeInTheDocument()
+    expect(screen.queryByText('十一月的日记')).toBeNull()
+    expect(screen.getByText('1 篇 · 共 4 字')).toBeInTheDocument()
+  })
+
+  it('切到“全部”后显示所有月份', async () => {
+    const user = userEvent.setup()
+    render(<EntryList collapsed={false} />)
+    await user.click(screen.getByRole('button', { name: '全部' }))
+    expect(screen.getByText('全部条目')).toBeInTheDocument()
+    expect(screen.getByText('十月的日记')).toBeInTheDocument()
+    expect(screen.getByText('十一月的日记')).toBeInTheDocument()
+  })
+
+  it('搜索跨月份，且不再受列表范围限制', () => {
+    useEntriesStore.setState({ searchQuery: '十一月' })
+    render(<EntryList collapsed={false} />)
+    expect(screen.getByText('搜索结果')).toBeInTheDocument()
+    expect(screen.getByText('1 个结果')).toBeInTheDocument()
+    // 命中处被 <mark> 切开，这里用日期行判断是哪一篇
+    expect(screen.getByText('11月6日 · 星期五')).toBeInTheDocument()
+    expect(screen.queryByText('10月5日 · 星期一')).toBeNull()
+  })
+
+  it('标签筛选也是全库视图', () => {
+    useEntriesStore.setState({ activeTag: '工作' })
+    render(<EntryList collapsed={false} />)
+    expect(screen.getByText('标签 #工作')).toBeInTheDocument()
+    expect(screen.getByText('十一月的日记')).toBeInTheDocument()
   })
 })

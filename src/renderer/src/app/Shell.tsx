@@ -120,13 +120,15 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
   const setTag = useEntriesStore((state) => state.setTag)
   const activeDate = useEntriesStore((state) => state.activeDate)
   const openDate = useEntriesStore((state) => state.openDate)
+  const calendarMonth = useUiStore((state) => state.calendarMonth)
+  const setCalendarMonth = useUiStore((state) => state.setCalendarMonth)
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [monthCursor, setMonthCursor] = useState<LocalDate>(activeDate)
   const [jumpOpen, setJumpOpen] = useState(false)
 
+  // 选中日期变化时，日历跟随到那一天所在的月份；单纯翻月不改变选中日期
   useEffect(() => {
-    setMonthCursor(activeDate)
-  }, [activeDate])
+    setCalendarMonth(activeDate)
+  }, [activeDate, setCalendarMonth])
 
   useEffect(() => {
     if (focusSearchSeq > 0) inputRef.current?.focus()
@@ -134,9 +136,9 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
 
   const tags = useMemo(() => collectTags(entries), [entries])
   const monthCount = useMemo(() => {
-    const { year, month } = monthOf(monthCursor)
+    const { year, month } = monthOf(calendarMonth)
     return countEntriesInMonth(entries, year, month)
-  }, [entries, monthCursor])
+  }, [entries, calendarMonth])
 
   return (
     <aside className={styles.sidebar} data-collapsed={collapsed} aria-hidden={collapsed}>
@@ -171,13 +173,13 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
             <span>{monthCount > 0 ? copy.sidebar.entryCountCalendar(monthCount) : ''}</span>
           </div>
           <CalendarPane
-            cursor={monthCursor}
+            cursor={calendarMonth}
             today={today}
             selected={activeDate}
             entries={entries}
             firstDayOfWeek={prefs?.firstDayOfWeek ?? 1}
             allowFutureEntries={prefs?.allowFutureEntries ?? false}
-            onCursorChange={setMonthCursor}
+            onCursorChange={setCalendarMonth}
             onSelect={(date) => {
               setView('editor')
               void openDate(date)
@@ -206,7 +208,7 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
             allowFutureEntries={prefs?.allowFutureEntries ?? false}
             onPick={(date) => {
               setView('editor')
-              setMonthCursor(date)
+              setCalendarMonth(date)
               void openDate(date)
             }}
           />
