@@ -62,8 +62,3 @@ linux:
     - deb
   category: Utility
   artifactName: ${productName}-${version}-${arch}.${ext}
-
-publish:
-  provider: github
-  owner: minidiary
-  repo: mini-diary

@@ -1,7 +1,7 @@
 {
   "name": "mini-diary",
   "productName": "Mini Diary",
-  "version": "4.0.0",
+  "version": "1.0.0",
   "description": "本地优先、默认加密、离线可用的桌面日记",
   "main": "./out/main/index.js",
   "author": {
@@ -35,7 +35,6 @@
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.3.1",
     "electron-log": "^5.4.4",
-    "electron-updater": "^6.8.11",
     "sanitize-html": "^2.18.1",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1"

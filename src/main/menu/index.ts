@@ -1,4 +1,4 @@
-import { Menu, app, dialog, shell, type MenuItemConstructorOptions } from 'electron'
+import { Menu, app, dialog, type MenuItemConstructorOptions } from 'electron'
 
 import { copy } from '@shared/copy'
 import { EVENTS } from '@shared/ipc'
@@ -6,7 +6,6 @@ import type { MenuCommand } from '@shared/types'
 
 import { broadcast } from '../broadcast'
 import type { AppContext } from '../context'
-import { checkForUpdates } from '../updater'
 
 const isMac = process.platform === 'darwin'
 
@@ -121,32 +120,19 @@ export function buildApplicationMenu(context: AppContext): Menu {
           : ([] satisfies MenuItemConstructorOptions[]))
       ]
     },
-    {
-      label: copy.menu.help,
-      submenu: [
-        {
-          label: copy.menu.checkForUpdates,
-          click: () => {
-            void checkForUpdates()
-          }
-        },
-        {
-          label: copy.menu.privacy,
-          click: () => {
-            void shell.openExternal('https://minidiary.app/privacy')
-          }
-        },
-        ...(isMac
-          ? ([] satisfies MenuItemConstructorOptions[])
-          : ([
-              { type: 'separator' },
+    ...(isMac
+      ? []
+      : [
+          {
+            label: copy.menu.help,
+            submenu: [
               {
                 label: copy.menu.about,
                 click: () => showAbout(context)
               }
-            ] satisfies MenuItemConstructorOptions[]))
-      ]
-    }
+            ]
+          }
+        ])
   ]
 
   return Menu.buildFromTemplate(template)
