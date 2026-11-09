@@ -29,6 +29,8 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:component && pnpm build",
     "package:dir": "pnpm build && node scripts/package-dir.mjs",
     "package:mac": "pnpm build && node scripts/package-dir.mjs --mac",
+    "package:mac:x64": "pnpm build && node scripts/package-dir.mjs --mac --arch=x64",
+    "package:mac:universal": "pnpm build && node scripts/package-dir.mjs --mac --arch=universal",
     "package:win": "pnpm build && node scripts/package-dir.mjs --win",
     "package:linux": "pnpm build && node scripts/package-dir.mjs --linux"
   },
