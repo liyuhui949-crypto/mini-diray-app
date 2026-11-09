@@ -69,7 +69,8 @@ docs/
 ├─ implementation-pipeline-v2.md   执行入口与阶段状态
 ├─ adr/                            架构决策记录
 ├─ known-issues.md                 代码审计：已知 bug 与清理清单（待统一修复）
-└─ usage.md                        使用说明（含迁移与隐私）
+├─ usage.md                        使用说明（含迁移与隐私）
+└─ packaging.md                    打包与分发（macOS，不上架 App Store）
 ```
 
 ## 安全基线
@@ -90,4 +91,4 @@ docs/
 - macOS App Store 分发不在范围内。
 
 更多实现细节见 [执行流水线](docs/implementation-pipeline-v2.md) 与 [ADR](docs/adr/0001-rewrite.md)；
-已知待修问题见 [已知问题清单](docs/known-issues.md)。
+已知待修问题见 [已知问题清单](docs/known-issues.md)；打包步骤见 [打包与分发](docs/packaging.md)。

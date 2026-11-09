@@ -1789,7 +1789,21 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
   按 id 缓存、锁定时清空；附件库中图片/视频/音频类的孤儿行可直接进灯箱（文件类仍标注不可预览）；
 - 测试：新增 `scanOrphans` 单测 1 条、e2e 2 条（模式切换/持久化与预览内互切、未引用查看/预览/清理并确认设置无入口）。
 
-### 15.25 已修复问题
+### 15.25 macOS 打包与分发
+
+- `scripts/package-dir.mjs` 支持 `--arch=arm64|x64|universal`，默认当前机器架构；本机已有 Electron 发行版时通过 `electronDist` 直接复用，不再联网下载；
+- 新增 `package:mac:x64` / `package:mac:universal`；`package:mac` 产出 arm64 dmg + zip；
+- 无证书时用 `CSC_IDENTITY_AUTO_DISCOVERY=false` 出未签名包（Gatekeeper 需右键打开或 `xattr`）；正式分发走 Developer ID + 公证（环境变量 `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`），不上架 App Store；
+- 文档：[docs/packaging.md](packaging.md)；
+- 无证书时 `scripts/after-pack.cjs` 自动做 ad-hoc 签名，修复「已损坏，无法打开」；
+- **体积**：`@fontsource` 整套字体不再进 asar，只把 PDF 用的 4 个 `.woff2` 放进 `Resources/fonts`；
+  asar 76 MB → 4.6 MB，dmg 185 MB → 117 MB，App 344 MB → 264 MB（其余是 Electron 运行时）；
+- 本次实测产物：`release/Mini Diary-1.0.0-arm64.dmg`（117 MB）、zip（114 MB），签名校验通过，
+  打包后 App 冒烟启动、PDF 导出（含中文字体）均正常，`app.getVersion() === 1.0.0`；
+- 注意：安装版与 `pnpm dev` 共享 `SingletonLock`，任一方先启动都会挡住另一方（单实例保护）；
+  开发模式拿不到锁时会弹提示框并打印终端信息，不再静默退出；打包文档已补充两者互相切换的命令。
+
+### 15.26 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|
