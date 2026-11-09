@@ -102,6 +102,8 @@ export interface Preferences {
   /** 条目列表宽度（px），缺省 312 */
   listWidth?: number
   annotationCollapsed?: boolean
+  /** 附件库点击可预览附件时的默认行为：直接看附件，还是看所属日记 */
+  attachmentPreviewMode?: 'attachment' | 'entry'
 }
 
 /** 迁移包内可移植的偏好子集（不含机器相关字段） */
@@ -198,6 +200,13 @@ export interface BootstrapInfo {
   version: string
   platform: string
   dev: boolean
+}
+
+/** 未被任何日记引用的遗留附件（没有 entry 元数据，只有 .mdat） */
+export interface OrphanAttachment {
+  id: string
+  size: number
+  kind: AttachmentKind
 }
 
 export interface StorageStats {

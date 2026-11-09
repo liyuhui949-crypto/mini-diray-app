@@ -3,6 +3,7 @@ import type { ZodType } from 'zod'
 import type {
   Annotation,
   Attachment,
+  OrphanAttachment,
   BootstrapInfo,
   DiaryEntry,
   EntryDraft,
@@ -106,6 +107,10 @@ export interface IpcContract {
     req: { dryRun: boolean; ids?: string[] }
     res: { count: number; bytes: number; ids: string[] }
   }
+  'attachment:orphans': {
+    req: void
+    res: { items: OrphanAttachment[] }
+  }
   'attachment:cancel': { req: { jobId: string }; res: void }
 
   'prefs:read': { req: void; res: Preferences }
@@ -198,6 +203,8 @@ export const requestValidators: RequestValidators = {
     z.object({ id: uuidSchema }).parse(payload) as IpcContract['attachment:saveAs']['req'],
   'attachment:delete': (payload) =>
     z.object({ id: uuidSchema }).parse(payload) as IpcContract['attachment:delete']['req'],
+  'attachment:orphans': (payload) =>
+    payload as IpcContract['attachment:orphans']['req'],
   'attachment:cleanup': (payload) =>
     z
       .object({ dryRun: z.boolean(), ids: z.array(uuidSchema).optional() })

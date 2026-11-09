@@ -152,11 +152,6 @@ export function PreferencesPane(): React.JSX.Element {
             </Button>
           </div>
         </Setting>
-        <Setting title={copy.preferences.cleanup} description={copy.preferences.cleanupDesc}>
-          <Button size="sm" onClick={() => openDialog('cleanup')}>
-            {copy.preferences.cleanupAction}
-          </Button>
-        </Setting>
       </section>
 
       <section className={styles.dangerBox}>

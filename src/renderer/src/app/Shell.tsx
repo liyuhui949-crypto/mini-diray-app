@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   BarChart3,
+  Box,
   ChevronRight,
   Loader2,
   Lock,
@@ -18,6 +19,7 @@ import { monthOf, todayLocalDate } from '@shared/date'
 import type { LocalDate, ThemeMode } from '@shared/types'
 
 import { call } from '@/api/client'
+import { AttachmentLibraryPane } from '@/features/attachments/AttachmentLibraryPane'
 import { CalendarPane } from '@/features/calendar/CalendarPane'
 import { JumpToDateDialog } from '@/features/calendar/JumpToDateDialog'
 import { EditorPane } from '@/features/editor/EditorPane'
@@ -86,6 +88,7 @@ export function Shell(): React.JSX.Element {
           {view === 'search' && searchQuery.trim() ? <SearchPane /> : null}
           {view === 'editor' || (view === 'search' && !searchQuery.trim()) ? <EditorPane /> : null}
           {view === 'stats' ? <StatsPane /> : null}
+          {view === 'attachments' ? <AttachmentLibraryPane /> : null}
           {view === 'settings' ? <PreferencesPane /> : null}
         </main>
       </div>
@@ -309,6 +312,12 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
       </div>
 
       <div className={styles.sideFooter}>
+        <NavButton
+          active={view === 'attachments'}
+          icon={<Box size={15} />}
+          label={copy.sidebar.attachments}
+          onClick={() => setView('attachments')}
+        />
         <NavButton
           active={view === 'stats'}
           icon={<BarChart3 size={15} />}

@@ -113,7 +113,8 @@ export const preferencesSchema = z.object({
   lastExportDir: z.string().nullable(),
   sidebarCollapsed: z.boolean().optional(),
   listWidth: z.number().int().min(240).max(420).optional(),
-  annotationCollapsed: z.boolean().optional()
+  annotationCollapsed: z.boolean().optional(),
+  attachmentPreviewMode: z.enum(['attachment', 'entry']).optional()
 })
 
 export const portablePreferencesSchema = z.object({

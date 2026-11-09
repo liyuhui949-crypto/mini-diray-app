@@ -31,7 +31,8 @@ export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
     lastExportDir: null,
     sidebarCollapsed: false,
     listWidth: 312,
-    annotationCollapsed: false
+    annotationCollapsed: false,
+    attachmentPreviewMode: 'entry'
   }
 }
 

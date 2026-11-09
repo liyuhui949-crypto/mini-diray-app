@@ -2,12 +2,18 @@ import { Readable } from 'node:stream'
 
 import { protocol } from 'electron'
 
-import type { Attachment } from '@shared/types'
-
 import { logger } from '../logger'
 import type { VaultRepository } from '../vault/repository'
+import { detectPlainType } from './orphans'
 import { contentRangeHeader, parseRangeHeader, unsatisfiedRangeHeader } from './range'
 import type { AttachmentStore } from './store'
+
+interface StreamMeta {
+  size: number
+  totalChunks: number
+  chunkSize: number
+  mime: string
+}
 
 export const ATTACHMENT_SCHEME = 'attachment'
 
@@ -39,6 +45,8 @@ const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  */
 export class AttachmentProtocol {
   private readonly controllers = new Set<AbortController>()
+  /** 未引用附件没有 entry 元数据，按需从 .mdat 头与明文头部推断并缓存 */
+  private readonly orphanCache = new Map<string, StreamMeta>()
 
   constructor(
     private readonly repository: VaultRepository,
@@ -58,6 +66,22 @@ export class AttachmentProtocol {
   abortAll(): void {
     for (const controller of this.controllers) controller.abort()
     this.controllers.clear()
+    this.orphanCache.clear()
+  }
+
+  private async resolveOrphan(id: string): Promise<StreamMeta | null> {
+    const cached = this.orphanCache.get(id)
+    if (cached) return cached
+    try {
+      const meta = await this.store.describe(id)
+      const { mime } = await detectPlainType(this.store, id, meta)
+      const value: StreamMeta = { ...meta, mime }
+      this.orphanCache.set(id, value)
+      return value
+    } catch {
+      this.orphanCache.delete(id)
+      return null
+    }
   }
 
   private async handle(request: Request): Promise<Response> {
@@ -74,43 +98,52 @@ export class AttachmentProtocol {
     }
     if (!ID_RE.test(id)) return new Response(null, { status: 404 })
 
+    let mime: string
+    let meta: Omit<StreamMeta, 'mime'>
     const found = this.repository.findAttachment(id)
-    if (!found) return new Response(null, { status: 404 })
-    const attachment: Attachment = found.attachment
+    if (found) {
+      const attachment = found.attachment
+      mime = attachment.mime
+      meta = {
+        size: attachment.size,
+        totalChunks: attachment.totalChunks,
+        chunkSize: attachment.chunkSize
+      }
+    } else {
+      // 也允许预览未被任何日记引用的附件（附件库的「未引用」列表）
+      const orphan = await this.resolveOrphan(id)
+      if (!orphan) return new Response(null, { status: 404 })
+      mime = orphan.mime
+      meta = { size: orphan.size, totalChunks: orphan.totalChunks, chunkSize: orphan.chunkSize }
+    }
 
     const baseHeaders: Record<string, string> = {
-      'Content-Type': attachment.mime,
+      'Content-Type': mime,
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       Pragma: 'no-cache',
       'Content-Disposition': 'inline',
       'Accept-Ranges': 'bytes',
       'X-Content-Type-Options': 'nosniff'
     }
-    const meta = {
-      size: attachment.size,
-      totalChunks: attachment.totalChunks,
-      chunkSize: attachment.chunkSize
-    }
-
     if (request.method === 'HEAD') {
       return new Response(null, {
         status: 200,
-        headers: { ...baseHeaders, 'Content-Length': String(attachment.size) }
+        headers: { ...baseHeaders, 'Content-Length': String(meta.size) }
       })
     }
 
     const rangeHeader = request.headers.get('Range')
-    const range = rangeHeader ? parseRangeHeader(rangeHeader, attachment.size) : null
+    const range = rangeHeader ? parseRangeHeader(rangeHeader, meta.size) : null
 
     if (rangeHeader && !range) {
       return new Response(null, {
         status: 416,
-        headers: { ...baseHeaders, 'Content-Range': unsatisfiedRangeHeader(attachment.size) }
+        headers: { ...baseHeaders, 'Content-Range': unsatisfiedRangeHeader(meta.size) }
       })
     }
 
     const start = range ? range.start : 0
-    const end = range ? range.end + 1 : attachment.size
+    const end = range ? range.end + 1 : meta.size
     const controller = new AbortController()
     this.controllers.add(controller)
 
@@ -129,7 +162,7 @@ export class AttachmentProtocol {
         ...baseHeaders,
         'Content-Length': String(end - start)
       }
-      if (range) headers['Content-Range'] = contentRangeHeader(range, attachment.size)
+      if (range) headers['Content-Range'] = contentRangeHeader(range, meta.size)
 
       return new Response(webStream, { status: range ? 206 : 200, headers })
     } catch (error) {

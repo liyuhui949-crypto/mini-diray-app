@@ -484,6 +484,17 @@ export class AttachmentStore {
     }
   }
 
+  /** 未引用附件没有 entry 元数据，只能从 .mdat 头读回尺寸/分块信息 */
+  async describe(id: string): Promise<{ size: number; totalChunks: number; chunkSize: number }> {
+    const { header, handle } = await this.readHeader(id)
+    await handle.close().catch(() => undefined)
+    return {
+      size: header.plaintextSize,
+      totalChunks: header.totalChunks,
+      chunkSize: header.chunkSize
+    }
+  }
+
   /** 供 protocol handler 做 Range 响应头 */
   async inspect(
     id: string,

@@ -26,6 +26,7 @@ import {
 import type { ImportFormat, StorageStats, ThemeSource } from '@shared/types'
 import { formatBytes } from '@shared/date'
 
+import { scanOrphans } from '../attachments/orphans'
 import { broadcast } from '../broadcast'
 import type { AppContext } from '../context'
 import { runExport } from '../export'
@@ -259,26 +260,23 @@ export function registerIpcHandlers(context: AppContext): void {
     jobs.cancel(jobId)
   })
 
+  register('attachment:orphans', async () => {
+    const { items } = await scanOrphans(repository, attachments)
+    return { items }
+  })
+
   register('attachment:cleanup', async ({ dryRun, ids }) => {
-    const referenced = new Set(
-      repository.getSnapshot().entries.flatMap((entry) => entry.attachments.map((item) => item.id))
-    )
-    const files = await attachments.listFiles()
-    const orphans: string[] = []
-    let bytes = 0
-    for (const file of files) {
-      const id = path.basename(file, '.mdat')
-      if (referenced.has(id)) continue
-      orphans.push(id)
-      bytes += await attachments.sizeOf(id)
-    }
+    const { items, bytes } = await scanOrphans(repository, attachments)
+    const orphanIds = items.map((item) => item.id)
 
-    if (dryRun) return { count: orphans.length, bytes, ids: orphans }
+    if (dryRun) return { count: orphanIds.length, bytes, ids: orphanIds }
 
-    const targets = ids && ids.length > 0 ? orphans.filter((id) => ids.includes(id)) : orphans
+    const targets =
+      ids && ids.length > 0 ? orphanIds.filter((id) => ids.includes(id)) : orphanIds
+    const sizeById = new Map(items.map((item) => [item.id, item.size]))
     let removedBytes = 0
     for (const id of targets) {
-      removedBytes += await attachments.sizeOf(id)
+      removedBytes += sizeById.get(id) ?? 0
       await attachments.remove(id)
     }
     logger.info('unreferenced attachments removed', { count: targets.length })
@@ -445,29 +443,14 @@ export function registerIpcHandlers(context: AppContext): void {
   // ───────────────────────── stats ─────────────────────────
   register('stats:storage', async (): Promise<StorageStats> => {
     const snapshot = repository.isUnlocked ? repository.getSnapshot() : null
-    const referenced = new Set(
-      (snapshot?.entries ?? []).flatMap((entry) => entry.attachments.map((item) => item.id))
-    )
-    const files = await attachments.listFiles()
-    let attachmentBytes = 0
-    let orphanBytes = 0
-    let orphanCount = 0
-    for (const file of files) {
-      const id = path.basename(file, '.mdat')
-      const size = await attachments.sizeOf(id)
-      attachmentBytes += size
-      if (!referenced.has(id)) {
-        orphanCount += 1
-        orphanBytes += size
-      }
-    }
+    const scan = await scanOrphans(repository, attachments, { sniff: false })
     const vaultStats = await fs.stat(vaultPaths(context.diaryDir).vaultFile).catch(() => null)
     return {
       entryCount: snapshot?.entries.length ?? 0,
-      attachmentCount: files.length,
-      attachmentBytes,
-      orphanCount,
-      orphanBytes,
+      attachmentCount: scan.totalCount,
+      attachmentBytes: scan.totalBytes,
+      orphanCount: scan.items.length,
+      orphanBytes: scan.bytes,
       vaultBytes: vaultStats?.size ?? 0
     }
   })

@@ -91,6 +91,7 @@ export const copy = {
     searchPlaceholder: '搜索标题和正文',
     calendar: '日历',
     tags: '标签',
+    attachments: '附件',
     stats: '统计',
     settings: '设置',
     lock: '锁定',
@@ -100,6 +101,38 @@ export const copy = {
     jumpToDate: '跳转到日期',
     noTags: '还没有标签',
     entryCountCalendar: (n: number) => `${n} 篇`
+  },
+
+  attachmentLibrary: {
+    title: '附件',
+    meta: (count: number, size: string) =>
+      `按格式分类 · 共 ${count} 个 · ${size} · 全部 AES-256-GCM 加密存放`,
+    tabs: {
+      all: '全部',
+      image: '图片',
+      video: '视频',
+      audio: '音频',
+      file: '文件',
+      orphan: '未引用'
+    },
+    sectionHint: (count: number, previewable: boolean) =>
+      `${count} 个 · ${previewable ? '可预览' : '不可预览'}`,
+    noPreview: '不可预览',
+    viewEntry: '查看日记 →',
+    viewOwner: '查看所属日记',
+    emptyTitle: '这一类还没有附件',
+    emptyHint: '写日记时点「附件」就能传进来，都会加密存放。',
+    emptyAction: '写今天的日记',
+    broken: '附件无法读取',
+    previewNote: (count: number) => `来自附件库 · 这篇共 ${count} 个附件 · 关闭即回`,
+    previewModeLabel: '点击预览方式',
+    modeAttachment: '预览附件',
+    modeEntry: '预览日记',
+    orphanName: (id: string) => `未引用附件 · ${id.slice(0, 8)}`,
+    orphanHint: (count: number, size: string) => `${count} 个 · 共 ${size} · 清理后不可恢复`,
+    orphanEmpty: '没有未引用的附件',
+    orphanEmptyHint: '被删除或替换掉的附件会留在这里，清理后释放空间。',
+    orphanCleanup: '清理未引用附件'
   },
 
   annotations: {
@@ -285,9 +318,6 @@ export const copy = {
     migrationDesc: '整库打包成单个加密文件，用于换机或归档',
     migrationImport: '导入…',
     migrationExport: '导出…',
-    cleanup: '清理未引用附件',
-    cleanupDesc: '删除没有被任何日记引用的附件，释放空间',
-    cleanupAction: '清理…',
     resetDiary: '清空全部日记',
     resetDiaryDesc: '删除所有日记与加密附件，保留密码与目录，不可恢复',
     resetAction: '清空…',

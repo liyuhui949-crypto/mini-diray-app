@@ -164,6 +164,7 @@ export default function App(): React.JSX.Element {
       {status === 'unlocked' ? <Shell /> : null}
       <Dialogs />
       <SearchPreviewDialog />
+      <SearchPreviewDialog from="library" />
       <Lightbox />
       <BusyOverlay />
       <ToastHost />
