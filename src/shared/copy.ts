@@ -5,7 +5,7 @@
 
 export const copy = {
   appName: 'Mini Diary',
-  appNameCN: '密记',
+  appNameCN: '日事',
 
   common: {
     cancel: '取消',
