@@ -40,7 +40,12 @@ const FONT_FILES: Record<string, string> = {
 function fontFilePath(name: string): string | null {
   const file = FONT_FILES[name]
   if (!file) return null
-  return path.join(app.getAppPath(), 'node_modules', '@fontsource', 'noto-sans-sc', 'files', file)
+  // 打包后字体只保留 PDF 用到的 4 个文件，放在 Resources/fonts（extraResources）；
+  // 开发态仍然从 node_modules 直接读
+  const dir = app.isPackaged
+    ? path.join(process.resourcesPath, 'fonts')
+    : path.join(app.getAppPath(), 'node_modules', '@fontsource', 'noto-sans-sc', 'files')
+  return path.join(dir, file)
 }
 
 const PRINT_CSS = `

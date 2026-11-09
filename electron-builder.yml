@@ -10,6 +10,17 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+  # 字体只把 PDF 用到的 4 个文件放进 extraResources，避免整套 75MB 字体进 asar
+  - '!node_modules/@fontsource/**'
+
+extraResources:
+  - from: node_modules/@fontsource/noto-sans-sc/files
+    to: fonts
+    filter:
+      - noto-sans-sc-chinese-simplified-400-normal.woff2
+      - noto-sans-sc-chinese-simplified-700-normal.woff2
+      - noto-sans-sc-latin-400-normal.woff2
+      - noto-sans-sc-latin-700-normal.woff2
 
 asar: true
 
