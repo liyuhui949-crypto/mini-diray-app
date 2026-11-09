@@ -297,7 +297,7 @@ pnpm test:e2e
 | N2 | 快捷键 | 菜单 accelerator + 编辑器 keymap | 常用操作可用；不与系统冲突 | P12 |
 | N3 | 导入/导出文件选择 | 主进程 `dialog` | 过滤器正确；取消不报错 | P9/P12 |
 | N4 | 系统主题跟随 | `nativeTheme` | 系统切换深浅色时 UI 跟随 | P11/P12 |
-| N5 | 自动更新 | `electron-updater` | 正式包可检查/下载/安装；开发态禁用 | P13 |
+| N5 | ~~自动更新~~（已移除，ADR 0007：只做安装包分发） | — | — | P13 |
 | N6 | 多语言界面（需求变更：仅简体中文） | `shared/copy.ts` | 无语言切换；菜单/对话框/PDF/错误全中文 | P2/P12 |
 | N7 | macOS/Windows/Linux 打包 | electron-builder | 三端安装包可启动；签名/公证通过 | P13 |
 | N8 | `.minidiary` 文件关联 | electron-builder `fileAssociations` + `open-file`/argv | 双击迁移包打开导入向导 | P10/P12 |
@@ -435,7 +435,7 @@ mini-diary/
 | PDF HTML | `marked` + `sanitize-html` | 主进程生成 HTML；必须 sanitize |
 | PDF 字体 | `@fontsource/noto-sans-sc` | 三端中文不乱码 |
 | 日志 | `electron-log` | 主进程文件日志；脱敏 |
-| 更新 | `electron-updater` | GitHub Releases |
+| 更新 | — | 不联网；安装包覆盖升级（ADR 0007） |
 | 打包 | electron-builder | 三端 |
 | 测试 | Vitest + RTL + Playwright `_electron` | 单测 + 真实 Electron |
 | i18n | **无** | 仅简体中文；`shared/copy.ts` |
@@ -463,7 +463,7 @@ lucide-react
 运行时（main）：
 
 ```text
-electron-log electron-updater
+electron-log
 yazl yauzl
 file-type
 marked sanitize-html
@@ -516,7 +516,6 @@ electron-builder
 | `vault:reset` | `{ password }` | `VaultSnapshot` | 清空内容；先提示导出迁移包 |
 | `vault:delete` | `{ password }` | `void` | 删除库并回 onboarding；不可恢复 |
 | `entry:save` | `{ entry }` | `{ revision, savedAt }` | 校验 date/title/tags/附件引用 |
-| `entry:delete` | `{ date }` | `{ revision }` | 清空/删除 |
 | `attachment:addFromPath` | `{ sourcePath }` | `Attachment` | 对话框/拖拽文件；主进程流式加密 |
 | `attachment:addBytes` | `{ name, mime, bytes }` | `Attachment` | 粘贴图片；≤50MB |
 | `attachment:cancel` | `{ jobId }` | `void` | 取消上传并清理 `.part` |
@@ -533,7 +532,6 @@ electron-builder
 | `prefs:read` | — | `Preferences` | 不含敏感信息 |
 | `prefs:update` | `Partial<Preferences>` | `Preferences` | 广播 |
 | `dialog:pickDirectory` | `{ purpose }` | `{ path? }` | 目录选择 |
-| `app:checkForUpdates` | — | `void` | 正式包 |
 | `shell:openExternal` | `{ url }` | `void` | 只允许 `https:` |
 
 事件（main → renderer）：
@@ -547,7 +545,6 @@ electron-builder
 | `menu:command` | 菜单/快捷键触发 |
 | `job:progress` | 附件上传/迁移/导入/导出进度 |
 | `job:done` / `job:error` | 任务完成/失败 |
-| `update:status` | 更新状态 |
 
 `attachment://` **不是 IPC**，由主进程 protocol handler 直接返回流。
 
@@ -1313,7 +1310,7 @@ P5/P8/P9/P11/P12 可在接口稳定后并行。
 - [ ] electron-builder：appId、productName、files、asar、图标、dmg/zip/nsis/AppImage/deb。
 - [ ] macOS 签名/公证；Windows 签名（如有）；Linux 包。
 - [ ] `fileAssociations` 注册 `.minidiary`。
-- [ ] electron-updater：GitHub provider、检查/下载/安装、进度、开发态禁用。
+- [x] ~~electron-updater~~：已按 ADR 0007 移除（安装包分发，不做在线更新）。
 - [ ] GitHub Actions：PR 校验、tag 三端构建/发布。
 - [ ] 升级 smoke：4.0.0-beta → 4.0.0；数据/迁移包可用。
 
@@ -1637,7 +1634,14 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 删除 `migration:inspect` IPC（它只用于判断"是否需要公钥"），导入界面固定显示公钥输入框；
 - 想迁移旧数据：先用旧版本导出 JSON，再用「导入 Mini Diary JSON」。
 
-### 15.10 检索洞察（搜索功能迭代）
+### 15.10 代码审计与已知问题清单
+
+2026-11-06 做了一轮全项目静态审计（死导出、未用文案/依赖、重复实现、潜在 bug），结果整理在
+[`known-issues.md`](./known-issues.md)：28 个死导出、79 个未用文案键、2 个未用依赖、
+9 组重复实现，以及 8 个潜在问题（其中 NFKC 索引错位、任务互斥未生效为 P1）。
+**本轮只记录、不修改**，按约定留到后续任务统一修复。
+
+### 15.11 检索洞察（搜索功能迭代）
 
 按 `SEARCH-PRD.md` v1.2 与 `prototype-v2.html` 对齐（本次未提交 git）：
 
@@ -1661,7 +1665,110 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 纯前端实现，无新增 IPC / 无持久索引；`analyzeSearch` 有 12 条单测覆盖，另加 1 条组件测试与
   1 条 e2e（概览 → 预览 → 跳转 → 输入清除）。
 
-### 15.11 已修复问题
+### 15.12 批注功能（ANNOTATION-PRD v1.0）
+
+- **可写性铁律**：`entry:save` 在主进程校验「只有今天可写」，历史正文/标题/附件只读；
+  判定收敛到 `shared/writeGuard.ts`，`allowFutureEntries` 只放开未来；测试/演示用
+  `MINIDIARY_ALLOW_HISTORY_WRITE=1` 造历史数据；
+- **存储**：`annotations/<date>.ann`（`INKANN1` 头 + 每行 `base64(nonce‖tag‖ciphertext)`，AAD 绑定日期与行号，
+  HKDF info `annotation-v1`），vault 新增 `annotationSeq` / `annotationDigests`；读取时只容忍被截断的最后一行；
+- **IPC**：只有 `annotation:add`，契约里没有 update/delete；`vault:snapshot` 带 `annotations`；
+- **UI**：右侧批注栏（内联编辑区 326→384px）、预览/源码双模式的锚点、选中浮条、空日期「已封存」+整篇批注、
+  日历三态点（绿=有日记/红=仅批注）、列表「批注 n」角标、状态栏只读文案；
+- **迁移包**：`annotations/**` 入包并计入 manifest 与 checksums；接管路径原样复制，原地替换/合并路径重加密写回，
+  合并时 id 重排；导入后 `reloadAnnotations()` 刷新内存；
+- 测试：133 单测（新增批注读写/AAD/篡改/重置/迁移 15 条） + 18 组件 + 5 条 e2e（新增批注全流程）。
+
+### 15.13 列表头部改版
+
+- 移除条目列表的「新建」按钮（连同窄窗口下的浮动 ＋），新建今天统一走「回到今天 / 日历选中今天 / 菜单写今天」；
+- 「本月 / 全部」范围切换上移到列表标题右侧（原「新建」位置），元信息行只留篇数与字数；
+- `copy.list.newEntry` 随之删除。
+
+### 15.14 重复实现归一化（known-issues D1–D9）
+
+按 `docs/known-issues.md` §3 把 9 组重复实现收敛：
+
+- **D1** 主进程两处本地 `escapeHtml` 删除，统一用 `@shared/markdown`；
+- **D2** 删除与 `startOfWeek` 完全重复的 `startOfIsoWeek`；
+- **D3** 删除 `searchEntries` / `SearchHit`（列表早已改用 `analyzeSearch`），测试迁移到分析函数；
+- **D4** 新增 `shared/text.ts`：`plainText` / `previewSnippet` / `buildSnippets` / `highlightSegments` 全部收口，
+  `words.makeSnippet` 只做调用；**D6** 区间查找合并为 `findRanges()` + `mergeRanges()`；
+- **D5** 删除 `deriveLocalTitle`，改用 `words.deriveTitle`；
+- **D7** 新增 `shared/limits.ts`（300MB 附件阈值、50MB 粘贴阈值），删除 store 里的重复常量；
+- **D8** `PASSWORD_MIN_LENGTH` 统一到 schema，建库/改密/导出三处 UI 复用；
+- **D9** 新增 `_hitMark.scss` mixin，React 侧统一 `mark.hitMark`，CodeMirror 装饰类复用同一 mixin。
+- 无行为变化：`pnpm verify` 与 5 条 e2e 全绿（单测 133 → 131，删掉的是已合并的重复用例）。
+
+### 15.15 安装包分发，移除在线更新（ADR 0007）
+
+- 删除 `src/main/updater.ts`、`electron-updater` 依赖、`app:checkForUpdates` IPC、`update:status` 事件与订阅、
+  菜单「检查更新…」、`UPDATE_UNAVAILABLE` 错误码与文案；`electron-builder.yml` 去掉 `publish` 段；
+- 版本号改为 **1.0.0**（`package.json`），「关于」从 `app.getVersion()` 读取，不再硬编码 `4.0.0`；
+- 升级方式：下载新安装包覆盖安装，数据目录、加密格式与迁移包格式均不变；
+- `docs/known-issues.md` 的 B3 因"功能整体移除"而关闭。
+
+### 15.16 清理"空壳"与死入口
+
+- **删**：菜单「帮助 → 隐私说明」（指向不存在的 `minidiary.app`，应用已零外链）；未使用的 `EmptyState`/`Spinner` 组件；
+  `MenuCommand` 的 `lock`/`check-for-updates` 与 `case 'lock': break`；
+  「删除条目」死能力（`entries.deleteActive` + `entry:delete` IPC + `repository.deleteEntry`，删日记仍靠清空字段的隐式删除）；
+  中栏折叠死逻辑（`ui.toggleList` + `listCollapsed`，连带 `EntryList` 的 `collapsed` 属性）；
+  无调用者的 `clearSearchJump` / `replaceDraft` / `setUnlockError` 与 `unlockError` 状态；
+  `copy` 里 68 个零引用键（清理后 346 个键全部有引用）。
+- **修**：附件「另存为」成功后 toast「已导出到 …」；统计页存储信息请求失败显示「统计计算失败」；
+  批注引文在正文里被删掉后，卡片显示「这条批注引用的原文已不在正文里」。
+- 无行为回退：`pnpm verify` 与 5 条 e2e 全绿。
+
+### 15.17 视频预览：全屏修复与文案
+
+- **根因**：启动时全局 `setPermissionRequestHandler(() => callback(false))` 把 Chromium 的 `fullscreen`
+  权限也拒了，于是 `video.requestFullscreen()` 静默失败（`fullscreenElement` 为 null、窗口不进全屏），
+  与 macOS 无关；
+- **修复**：权限白名单只放行 `fullscreen`（并补 `setPermissionCheckHandler`），其余权限继续一律拒绝；
+- **文案**：视频卡片原「点击查看原图」改为「放大播放」；图片仍是「点击查看原图」。
+
+### 15.18 列宽可调与折叠
+
+- 左栏（日历/标签/设置）与批注栏都支持**拖拽改宽**（左右边缘 7px 手柄，键盘 ←/→ 也能调，双击复位）；
+- 左栏标题栏新增折叠按钮（菜单 `⌘⌥B` 仍可用）；批注栏头部新增「收起批注栏」，收起后正文右侧留「批注 n」药丸可一键展开；
+- 宽度与折叠状态写入 `preferences.json`（`sidebarWidth`/`sidebarCollapsed`/`annotationWidth`/`annotationCollapsed`，旧文件缺字段时用默认值）；
+- **拖到最窄即收起**：越过阈值（左栏 160 / 批注栏 260）直接折叠，不必再去点按钮；
+- ~~批注栏宽度会按视口自动收窄~~（§15.20 改为固定宽度 + 完全展开/收起）；
+- e2e 增加批注栏收起/展开断言。
+
+### 15.19 条目列表宽度可调
+
+- 「全部条目」列表（中栏）加入拖拽手柄，范围 240–420px，默认 312px；
+- 宽度写入 `preferences.json` 的 `listWidth`，重启保持；旧配置缺字段时用 312；
+- 新增 `tests/e2e/layout.spec.ts`：拖宽后重载，宽度仍在。
+
+### 15.20 批注栏改为固定宽度，只做完全展开/收起
+
+- 按需求去掉批注栏的拖拽手柄与 `annotationWidth` 偏好：宽度固定 326px（写批注时 384px）；
+- 保留两态切换：头部「›」收起 / 正文右上角「批注 n」药丸展开，状态仍持久化（`annotationCollapsed`）；
+- 左栏与条目列表的宽度拖拽不受影响；`annotationWidth` 从 schema/默认值/UI store 中移除（旧配置文件里的该字段会被忽略）。
+
+### 15.21 清掉重复实现与死代码
+
+- **A1** 附件「另存为」抽成 `saveAttachmentAs()`，灯箱与预览文件卡片共用（此前预览那边漏了 toast）；
+- **A2** 布局持久化统一走 `persistLayout()`（列宽/折叠共 6 处调用），并吞掉写盘失败；
+- **A3** 删除 `shared/writeGuard.ts` 里没人用的 `assertWritableDate`（IPC 侧保留自己的 `AppError` 包装）；
+- **A4/B4/B5** 删除两处 `annFlash` 动画与 `.anchorActive`、`.ann-mark.flash`（从未被触发）；
+- **B1/B2/B3** 删除已失效的样式：`.quickNew`、`.newBtn`、`.list[data-collapsed]`；
+- **B6** 删除 `.srOnly`、`.searchDoc`；
+- **B7** 删除 8 个零引用 helper：`compareLocalDate`、`isAfter`、`formatShortDateCN`、`monthNameCN`、`monthStart`、`messageForCode`、`isPackageFile`、`nowLocalDate`；
+- **C** 收窄 `text.ts` / `annotations.ts` / `entries.ts` 中仅内部使用的导出。
+- 行为不变：`pnpm verify` 与 6 条 e2e 全绿。
+
+### 15.22 左栏改为纯展开/收起，批注栏去掉加号
+
+- 左栏（日历/标签/设置）不再支持拖拽改宽：固定 236px，只保留标题栏按钮 / `⌘⌥B` 的完全收起与展开；
+  `sidebarWidth` 从 schema、默认值、UI store、`persistLayout` 中移除（旧配置里的该字段会被忽略）；
+- 批注栏头部去掉「＋」图标，改为一行提示文本「选中正文即可加批注」；整篇批注仍走空日期里的 CTA；
+- 现在只有条目列表支持拖拽改宽（240–420px，`listWidth` 持久化）。
+
+### 15.23 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|
