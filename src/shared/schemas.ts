@@ -60,12 +60,28 @@ export const diaryEntrySchema = z.object({
   updatedAt: z.string().min(1)
 })
 
+export const QUOTE_MAX_LENGTH = 90
+export const ANNOTATION_TAG_MAX_LENGTH = 24
+export const ANNOTATION_BODY_MAX_LENGTH = 100_000
+
+export const annotationSchema = z.object({
+  id: z.string().regex(/^n\d+$/, '非法批注 ID'),
+  date: localDateSchema,
+  quote: z.string().max(QUOTE_MAX_LENGTH),
+  tag: z.string().max(ANNOTATION_TAG_MAX_LENGTH),
+  body: z.string().min(1).max(ANNOTATION_BODY_MAX_LENGTH),
+  at: z.string().min(1),
+  createdAt: z.number().int().nonnegative()
+})
+
 export const vaultDataSchema = z.object({
   schemaVersion: z.number().int().positive(),
   vaultId: uuidSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
-  entries: z.array(diaryEntrySchema)
+  entries: z.array(diaryEntrySchema),
+  annotationSeq: z.number().int().nonnegative().optional(),
+  annotationDigests: z.record(z.string(), z.string().regex(SHA256_RE)).optional()
 })
 
 export const entryDraftSchema = z.object({
@@ -94,7 +110,10 @@ export const preferencesSchema = z.object({
   diaryDir: z.string().min(1),
   lastOpenedDate: localDateSchema.nullable(),
   lastImportDir: z.string().nullable(),
-  lastExportDir: z.string().nullable()
+  lastExportDir: z.string().nullable(),
+  sidebarCollapsed: z.boolean().optional(),
+  listWidth: z.number().int().min(240).max(420).optional(),
+  annotationCollapsed: z.boolean().optional()
 })
 
 export const portablePreferencesSchema = z.object({
@@ -104,9 +123,11 @@ export const portablePreferencesSchema = z.object({
   autoLockMinutes: autoLockSchema
 })
 
+export const PASSWORD_MIN_LENGTH = 8
+
 export const passwordSchema = z
   .string()
-  .min(8, '密码至少 8 位')
+  .min(PASSWORD_MIN_LENGTH, `密码至少 ${PASSWORD_MIN_LENGTH} 位`)
   .max(200, '密码最多 200 位')
 
 export const migrationPackageFormat = z.number().int().positive()
@@ -120,6 +141,7 @@ export const migrationManifestSchema = z.object({
   vaultId: uuidSchema,
   entryCount: z.number().int().nonnegative(),
   attachmentCount: z.number().int().nonnegative(),
+  annotationCount: z.number().int().nonnegative().optional(),
   totalAttachmentBytes: z.number().int().nonnegative(),
   firstDate: localDateSchema.nullable(),
   lastDate: localDateSchema.nullable(),

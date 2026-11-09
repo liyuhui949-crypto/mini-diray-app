@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 
-import type { Attachment, DiaryEntry, EntryDraft, LocalDate, VaultSnapshot } from '@shared/types'
+import type {
+  Annotation,
+  Attachment,
+  DiaryEntry,
+  EntryDraft,
+  LocalDate,
+  VaultSnapshot
+} from '@shared/types'
 import { countEntryWords } from '@shared/words'
 import { todayLocalDate } from '@shared/date'
 
@@ -14,11 +21,11 @@ let timer: ReturnType<typeof setTimeout> | null = null
 let draftVersion = 0
 let savingPromise: Promise<void> | null = null
 
-export function emptyDraft(date: LocalDate): EntryDraft {
+function emptyDraft(date: LocalDate): EntryDraft {
   return { date, title: '', body: '', tags: [], attachments: [] }
 }
 
-export function toDraft(entry: DiaryEntry): EntryDraft {
+function toDraft(entry: DiaryEntry): EntryDraft {
   return {
     date: entry.date,
     title: entry.title,
@@ -43,6 +50,8 @@ function sortEntries(entries: DiaryEntry[]): DiaryEntry[] {
 
 interface EntriesState {
   entries: DiaryEntry[]
+  /** 按日期分组的批注（只增不改） */
+  annotations: Record<string, Annotation[]>
   activeDate: LocalDate
   draft: EntryDraft | null
   saveState: SaveState
@@ -59,18 +68,23 @@ interface EntriesState {
   updateDraft: (patch: Partial<Omit<EntryDraft, 'date'>>) => void
   addAttachment: (attachment: Attachment) => void
   removeAttachment: (id: string) => void
-  replaceDraft: (draft: EntryDraft) => void
   flush: () => Promise<void>
   setSearchInput: (value: string) => void
   commitSearch: (value?: string) => void
   clearSearch: () => void
   setTag: (tag: string | null) => void
-  deleteActive: () => Promise<void>
+  addAnnotation: (input: {
+    date: string
+    quote: string
+    tag: string
+    body: string
+  }) => Promise<Annotation>
   wordCount: () => number
 }
 
 export const useEntriesStore = create<EntriesState>((set, get) => ({
   entries: [],
+  annotations: {},
   activeDate: todayLocalDate(),
   draft: null,
   saveState: 'saved',
@@ -86,6 +100,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     const existing = entries.find((entry) => entry.date === activeDate)
     set({
       entries,
+      annotations: snapshot.annotations ?? {},
       draft: existing ? toDraft(existing) : emptyDraft(activeDate),
       saveState: 'saved',
       saveError: null
@@ -95,6 +110,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   clear: () =>
     set({
       entries: [],
+      annotations: {},
       draft: null,
       saveState: 'saved',
       savedAt: null,
@@ -150,10 +166,6 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     })
   },
 
-  replaceDraft: (draft) => {
-    draftVersion += 1
-    set({ draft, saveState: 'dirty' })
-  },
 
   flush: async () => {
     if (savingPromise) {
@@ -209,6 +221,17 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     }
   },
 
+  addAnnotation: async ({ date, quote, tag, body }) => {
+    const result = await call('annotation:add', { date, quote, tag, body })
+    set({
+      annotations: {
+        ...get().annotations,
+        [date]: result.annotations
+      }
+    })
+    return result.annotation
+  },
+
   setSearchInput: (searchInput) => set({ searchInput }),
   // 提交就是"检索"：输入框内容与检索词对齐，列表与分析同时更新
   commitSearch: (value) => {
@@ -217,19 +240,6 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   },
   clearSearch: () => set({ searchInput: '', searchQuery: '' }),
   setTag: (activeTag) => set({ activeTag }),
-
-  deleteActive: async () => {
-    const { activeDate } = get()
-    const result = await call('entry:delete', { date: activeDate })
-    set({
-      entries: get().entries.filter((entry) => entry.date !== activeDate),
-      draft: emptyDraft(activeDate),
-      saveState: 'saved',
-      savedAt: null,
-      saveError: null
-    })
-    void result
-  },
 
   wordCount: () => {
     const draft = get().draft

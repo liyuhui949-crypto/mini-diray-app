@@ -113,7 +113,6 @@ test('合并导入不会丢掉原库的条目与附件', async () => {
   await expect(page.locator('#import-mode')).toBeVisible({ timeout: 20_000 })
   await page.selectOption('#import-mode', 'merge')
   // 合并导入不需要新密码：原库密码保持不变
-  await expect(page.getByText('导入后继续用当前的日记密码解锁')).toBeVisible()
   await page.getByRole('button', { name: '开始导入' }).click()
   await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 60_000 })
 

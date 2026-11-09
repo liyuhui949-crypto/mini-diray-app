@@ -15,6 +15,7 @@ export interface StagingPaths {
   root: string
   vaultFile: string
   attachmentsDir: string
+  annotationsDir: string
 }
 
 export async function createStagingDir(diaryDir: string, jobId: string): Promise<StagingPaths> {
@@ -23,7 +24,14 @@ export async function createStagingDir(diaryDir: string, jobId: string): Promise
   await removePath(root).catch(() => undefined)
   const paths = vaultPaths(root)
   await ensureVaultDirs(paths)
-  return { root, vaultFile: paths.vaultFile, attachmentsDir: paths.attachmentsDir }
+  const annotationsDir = path.join(root, 'annotations')
+  await fs.mkdir(annotationsDir, { recursive: true, mode: 0o700 })
+  return {
+    root,
+    vaultFile: paths.vaultFile,
+    attachmentsDir: paths.attachmentsDir,
+    annotationsDir
+  }
 }
 
 export interface SwitchResult {
@@ -43,6 +51,8 @@ export async function switchStagingIntoPlace(
   const migrationDir = target.migrationDir
   const hasCurrentVault = await pathExists(target.vaultFile)
   const hasCurrentAttachments = await pathExists(target.attachmentsDir)
+  const annotationsDir = path.join(diaryDir, 'annotations')
+  const hasCurrentAnnotations = await pathExists(annotationsDir)
 
   if (!(await pathExists(staging.vaultFile))) {
     throw new AppError('IO_ERROR', '导入暂存目录缺少日记库文件')
@@ -57,6 +67,7 @@ export async function switchStagingIntoPlace(
 
   let vaultBackedUp = false
   let attachmentsBackedUp = false
+  let annotationsBackedUp = false
   let vaultInstalled = false
 
   try {
@@ -70,10 +81,20 @@ export async function switchStagingIntoPlace(
       await fs.rename(target.attachmentsDir, path.join(rollbackDir, 'attachments'))
       attachmentsBackedUp = true
     }
+    if (rollbackDir && hasCurrentAnnotations) {
+      await fs.rename(annotationsDir, path.join(rollbackDir, 'annotations'))
+      annotationsBackedUp = true
+    }
 
     // 旧附件目录已搬走；保险起见清掉可能存在的空目录，再整体换成 staging 的
     if (await pathExists(target.attachmentsDir)) await removePath(target.attachmentsDir)
     await fs.rename(staging.attachmentsDir, target.attachmentsDir)
+
+    // 批注目录整体换入（包内没有批注时就是一个空目录）
+    await fs.rm(annotationsDir, { recursive: true, force: true })
+    await fs.rename(staging.annotationsDir, annotationsDir).catch(async () => {
+      await fs.mkdir(annotationsDir, { recursive: true, mode: 0o700 })
+    })
 
     // 最后换 vault：即使中途断电，最坏情况是多出几个未被引用的附件
     await fs.rename(staging.vaultFile, target.vaultFile)
@@ -84,6 +105,10 @@ export async function switchStagingIntoPlace(
     }
     if (attachmentsBackedUp && rollbackDir) {
       await fs.rename(path.join(rollbackDir, 'attachments'), target.attachmentsDir).catch(() => undefined)
+    }
+    if (annotationsBackedUp && rollbackDir) {
+      await fs.rm(annotationsDir, { recursive: true, force: true }).catch(() => undefined)
+      await fs.rename(path.join(rollbackDir, 'annotations'), annotationsDir).catch(() => undefined)
     }
     if (vaultBackedUp && rollbackDir) {
       await fs.rename(path.join(rollbackDir, 'diary.vault'), target.vaultFile).catch(() => undefined)
@@ -109,6 +134,12 @@ export async function restoreFromRollback(
   if (await pathExists(backupAttachments)) {
     await removePath(target.attachmentsDir)
     await fs.rename(backupAttachments, target.attachmentsDir)
+  }
+  const backupAnnotations = path.join(rollbackDir, 'annotations')
+  const annotationsDir = path.join(diaryDir, 'annotations')
+  if (await pathExists(backupAnnotations)) {
+    await removePath(annotationsDir)
+    await fs.rename(backupAnnotations, annotationsDir)
   }
 }
 

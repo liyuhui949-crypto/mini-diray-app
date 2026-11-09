@@ -212,6 +212,87 @@ describe('迁移包 roundtrip', () => {
     }
   })
 
+  it('批注随迁移包一起走：导出包含 annotations/，全新导入后记录仍在', async () => {
+    const source = await makeSource()
+    const pkgDir = await tempDir('minidiary-pkg-')
+    const targetDir = await tempDir('minidiary-dst-')
+    try {
+      await source.repo.addAnnotation({
+        date: '2026-10-31',
+        quote: '注意力不是一种资源',
+        tag: '#待核实',
+        body: '出处待补（可能是 Cal Newport）'
+      })
+      const packagePath = path.join(pkgDir, 'ann.minidiary')
+      await exportSource(source, packagePath)
+
+      const archive = await ZipArchive.open(packagePath, {
+        allowMember: () => true
+      })
+      try {
+        expect(archive.names()).toContain('annotations/2026-10-31.ann')
+      } finally {
+        archive.close()
+      }
+
+      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      const importer = new MigrationImporter({
+        repository: repo,
+        store: new AttachmentStore(targetDir, () => repo.getAttachmentKey()),
+        scrypt: FAST
+      })
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
+      expect(preview.summary.annotationCount).toBe(1)
+      await importer.run({ token: preview.token, mode: 'replace', job: job('migration-import') })
+
+      const snapshot = await repo.unlock(PACKAGE_PASSWORD)
+      const records = snapshot.annotations['2026-10-31'] ?? []
+      expect(records).toHaveLength(1)
+      expect(records[0]?.tag).toBe('待核实')
+      expect(records[0]?.quote).toBe('注意力不是一种资源')
+    } finally {
+      await rm(source.dir, { recursive: true, force: true })
+      await rm(pkgDir, { recursive: true, force: true })
+      await rm(targetDir, { recursive: true, force: true })
+    }
+  })
+
+  it('合并导入时批注重排 id，两边都保留', async () => {
+    const source = await makeSource()
+    const pkgDir = await tempDir('minidiary-pkg-')
+    const targetDir = await tempDir('minidiary-dst-')
+    try {
+      await source.repo.addAnnotation({
+        date: '2026-10-31',
+        quote: '',
+        tag: '来源',
+        body: '来自包里的批注'
+      })
+      const packagePath = path.join(pkgDir, 'ann-merge.minidiary')
+      await exportSource(source, packagePath)
+
+      const repo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      await repo.create('target-password-1234')
+      await repo.addAnnotation({ date: '2026-10-31', quote: '', tag: '本地', body: '本地批注' })
+      const importer = new MigrationImporter({
+        repository: repo,
+        store: new AttachmentStore(targetDir, () => repo.getAttachmentKey()),
+        scrypt: FAST
+      })
+      const preview = await importer.preview(packagePath, PACKAGE_PASSWORD, PACKAGE_KEY)
+      await importer.run({ token: preview.token, mode: 'merge', job: job('migration-import') })
+
+      const records = repo.getSnapshot().annotations['2026-10-31'] ?? []
+      expect(records).toHaveLength(2)
+      expect(new Set(records.map((item) => item.id)).size).toBe(2)
+      expect(records.map((item) => item.tag).sort()).toEqual(['来源', '本地'].sort())
+    } finally {
+      await rm(source.dir, { recursive: true, force: true })
+      await rm(pkgDir, { recursive: true, force: true })
+      await rm(targetDir, { recursive: true, force: true })
+    }
+  })
+
   it('篡改 vault.inkv 的包会被拒绝', async () => {
     const source = await makeSource()
     const pkgDir = await tempDir('minidiary-pkg-')

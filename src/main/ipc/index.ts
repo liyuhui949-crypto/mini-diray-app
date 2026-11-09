@@ -13,6 +13,8 @@ import {
 } from 'electron'
 
 import { copy } from '@shared/copy'
+import { todayLocalDate } from '@shared/date'
+import { isWritableDate } from '@shared/writeGuard'
 import { AppError, toErrorPayload } from '@shared/errors'
 import {
   EVENTS,
@@ -31,7 +33,6 @@ import { jobs } from '../jobs'
 import { logger } from '../logger'
 import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
-import { checkForUpdates } from '../updater'
 import { ensureVaultDirs, vaultPaths } from '../vault/paths'
 import { isTrustedWebContents } from '../window'
 
@@ -122,10 +123,6 @@ export function registerIpcHandlers(context: AppContext): void {
     context.ackFlush(token)
   })
 
-  register('app:checkForUpdates', async () => {
-    await checkForUpdates()
-  })
-
   register('app:openDiaryDir', async () => {
     const dir = context.diaryDir
     await ensureVaultDirs(vaultPaths(dir))
@@ -178,8 +175,25 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   // ───────────────────────── entries ─────────────────────────
-  register('entry:save', async ({ entry }) => repository.saveEntry(entry))
-  register('entry:delete', async ({ date }) => repository.deleteEntry(date))
+  // 可写性铁律：只有今天能写；allowFutureEntries 打开时未来也可写；历史正文封存
+  const assertWritableDate = (date: string): void => {
+    const writable = isWritableDate(date, {
+      today: todayLocalDate(),
+      allowFutureEntries: preferences.current.allowFutureEntries,
+      allowHistory: process.env['MINIDIARY_ALLOW_HISTORY_WRITE'] === '1'
+    })
+    if (!writable) throw new AppError('INVALID_DATE', '只能写今天；历史正文已封存')
+  }
+
+  register('entry:save', async ({ entry }) => {
+    assertWritableDate(entry.date)
+    return repository.saveEntry(entry)
+  })
+  // ───────────────────────── annotations ─────────────────────────
+  register('annotation:add', async ({ date, quote, tag, body }) => {
+    const result = await repository.addAnnotation({ date, quote, tag, body })
+    return { ...result, revision: repository.currentRevision }
+  })
 
   // ───────────────────────── attachments ─────────────────────────
   const addAttachmentFromPath = async (sourcePath: string): Promise<IpcContract['attachment:addFromPath']['res']> => {

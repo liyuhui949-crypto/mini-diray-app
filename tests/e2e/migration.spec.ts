@@ -100,7 +100,7 @@ test('导出迁移包再导入到全新安装', async () => {
     await page.getByRole('button', { name: '下一步' }).click()
 
     // 导入不需要设置新密码：没有库时，导入后的解锁密码就是迁移包的私钥
-    await expect(page.getByText('导入后这个库用迁移包的私钥')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('#import-mode')).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: '开始导入' }).click()
 
     await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 60_000 })

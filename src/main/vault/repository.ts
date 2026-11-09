@@ -3,10 +3,29 @@ import path from 'node:path'
 
 import { AppError } from '@shared/errors'
 import { normalizeTags } from '@shared/schemas'
-import type { DiaryEntry, EntryDraft, LocalDate, VaultData, VaultSnapshot, VaultStatus } from '@shared/types'
+import type {
+  Annotation,
+  DiaryEntry,
+  EntryDraft,
+  LocalDate,
+  VaultData,
+  VaultSnapshot,
+  VaultStatus
+} from '@shared/types'
+import { toLocalDate } from '@shared/date'
 import { countEntryWords } from '@shared/words'
 
 import { logger } from '../logger'
+import {
+  annotationFile,
+  annotationKey,
+  appendAnnotation,
+  buildAnnotation,
+  digestOfFile,
+  loadAllAnnotations,
+  removeAllAnnotations,
+  type NewAnnotationInput
+} from './annotations'
 import { deriveAttachmentKey, wipe, type ScryptParams } from './crypto'
 import {
   MIGRATION_VAULT_MEMBER,
@@ -75,6 +94,8 @@ export class VaultRepository {
   private envelope: VaultEnvelope | null = null
   private dek: Buffer | null = null
   private attachmentKey: Buffer | null = null
+  private annotations: Record<string, Annotation[]> | null = null
+  private annotationKeyCache: Buffer | null = null
   private data: VaultData | null = null
   private revision = 0
   private writeChain: Promise<void> = Promise.resolve()
@@ -129,6 +150,19 @@ export class VaultRepository {
     return this.attachmentKey
   }
 
+  /** 迁移导入重加密批注时使用的密钥；永不跨 IPC */
+  getAnnotationKey(): Buffer {
+    if (!this.annotationKeyCache) throw new AppError('VAULT_LOCKED')
+    return this.annotationKeyCache
+  }
+
+  /** 磁盘上的批注被整体重写后，重新载入内存 */
+  async reloadAnnotations(): Promise<void> {
+    this.assertUnlocked()
+    await this.loadAnnotations()
+    this.revision += 1
+  }
+
   getVaultId(): string {
     if (!this.data) throw new AppError('VAULT_LOCKED')
     return this.data.vaultId
@@ -140,8 +174,75 @@ export class VaultRepository {
       schemaVersion: this.data.schemaVersion,
       revision: this.revision,
       vaultId: this.data.vaultId,
-      entries: this.data.entries.map((entry) => structuredClone(entry))
+      entries: this.data.entries.map((entry) => structuredClone(entry)),
+      annotations: structuredClone(this.annotations ?? {})
     }
+  }
+
+  /** 载入（或重新载入）全部批注；发现哈希不符只记录，不阻断解锁 */
+  private async loadAnnotations(): Promise<void> {
+    if (!this.annotationKeyCache || !this.data) return
+    try {
+      this.annotations = await loadAllAnnotations(this.dir, this.annotationKeyCache)
+    } catch (error) {
+      this.annotations = {}
+      logger.error('annotation load failed', error)
+    }
+    const digests = this.data.annotationDigests ?? {}
+    for (const [date, expected] of Object.entries(digests)) {
+      try {
+        const actual = await digestOfFile(annotationFile(this.dir, date))
+        if (actual !== expected) {
+          logger.warn('annotation file digest mismatch', { date })
+        }
+      } catch {
+        logger.warn('annotation file missing', { date })
+      }
+    }
+  }
+
+  /** 追加一条批注（只增不改）；日期必须是今天或更早 */
+  async addAnnotation(
+    input: NewAnnotationInput,
+    now: Date = this.clock()
+  ): Promise<{ annotation: Annotation; annotations: Annotation[] }> {
+    this.assertUnlocked()
+    const data = this.requireData()
+    if (!this.annotationKeyCache) throw new AppError('VAULT_LOCKED')
+
+    const today = toLocalDate(now)
+    if (input.date > today) {
+      throw new AppError('INVALID_DATE', '未来日期不能加批注')
+    }
+
+    const seq = (data.annotationSeq ?? this.maxAnnotationSeq()) + 1
+    const annotation = buildAnnotation(input, seq, now)
+    const digest = await appendAnnotation(this.dir, this.annotationKeyCache, annotation)
+
+    data.annotationSeq = seq
+    data.annotationDigests = { ...(data.annotationDigests ?? {}), [annotation.date]: digest }
+    data.updatedAt = now.toISOString()
+    await this.persist(data)
+
+    const list = [...(this.annotations?.[annotation.date] ?? []), annotation].sort(
+      (a, b) => a.createdAt - b.createdAt
+    )
+    this.annotations = { ...(this.annotations ?? {}), [annotation.date]: list }
+    this.revision += 1
+    logger.info('annotation added', { date: annotation.date })
+    return { annotation, annotations: list }
+  }
+
+  /** 旧库没有 annotationSeq 时，从内存里已有的记录推算 */
+  private maxAnnotationSeq(): number {
+    let max = 0
+    for (const list of Object.values(this.annotations ?? {})) {
+      for (const item of list) {
+        const value = Number(item.id.slice(1))
+        if (Number.isInteger(value) && value > max) max = value
+      }
+    }
+    return max
   }
 
   getEntry(date: LocalDate): DiaryEntry | null {
@@ -173,7 +274,9 @@ export class VaultRepository {
     this.envelope = envelope
     this.dek = dek
     this.attachmentKey = deriveAttachmentKey(dek, data.vaultId)
+    this.annotationKeyCache = annotationKey(dek, data.vaultId)
     this.data = data
+    this.annotations = {}
     this.revision = 1
     logger.info('vault created')
     return this.getSnapshot()
@@ -194,8 +297,10 @@ export class VaultRepository {
     this.envelope = envelope
     this.dek = opened.dek
     this.attachmentKey = deriveAttachmentKey(opened.dek, envelope.vaultId)
+    this.annotationKeyCache = annotationKey(opened.dek, envelope.vaultId)
     this.data = opened.data
     this.revision += 1
+    await this.loadAnnotations()
     logger.info('vault unlocked', { entries: opened.data.entries.length })
     return this.getSnapshot()
   }
@@ -204,8 +309,11 @@ export class VaultRepository {
   lock(): void {
     wipe(this.dek)
     wipe(this.attachmentKey)
+    wipe(this.annotationKeyCache)
     this.dek = null
     this.attachmentKey = null
+    this.annotationKeyCache = null
+    this.annotations = null
     this.envelope = null
     this.data = null
     logger.info('vault locked')
@@ -268,16 +376,6 @@ export class VaultRepository {
     await this.persist(data)
     this.revision += 1
     return { revision: this.revision, entry: structuredClone(entry), savedAt: timestamp }
-  }
-
-  async deleteEntry(date: LocalDate): Promise<{ revision: number }> {
-    this.assertUnlocked()
-    const data = this.requireData()
-    data.entries = data.entries.filter((entry) => entry.date !== date)
-    data.updatedAt = this.clock().toISOString()
-    await this.persist(data)
-    this.revision += 1
-    return { revision: this.revision }
   }
 
   /**
@@ -394,9 +492,13 @@ export class VaultRepository {
     await createRollbackPoint(this.dir, jobId, { attachments: true })
     try {
       data.entries = []
+      data.annotationSeq = 0
+      data.annotationDigests = {}
       data.updatedAt = now
       await this.persist(data)
       await removePath(this.paths.attachmentsDir)
+      await removeAllAnnotations(this.dir)
+      this.annotations = {}
       await ensureVaultDirs(this.paths)
       await deleteRollbackPoint(this.dir, jobId)
     } catch (error) {

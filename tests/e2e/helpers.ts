@@ -28,6 +28,8 @@ export async function launchApp(home: string): Promise<LaunchedApp> {
       NODE_ENV: 'production',
       MINIDIARY_SILENT: '1',
       MINIDIARY_USER_DATA: path.join(home, 'userdata'),
+      // 测试夹具需要写历史日期（产品里历史正文是只读的）
+      MINIDIARY_ALLOW_HISTORY_WRITE: '1',
       MINIDIARY_DIARY_DIR: path.join(home, 'diary')
     }
   })

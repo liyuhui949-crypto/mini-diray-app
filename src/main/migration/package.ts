@@ -10,13 +10,16 @@ export const PACKAGE_MEMBER = {
   vault: 'vault.inkv',
   prefs: 'prefs.json',
   checksums: 'checksums.sha256',
-  attachmentsPrefix: 'attachments/'
+  attachmentsPrefix: 'attachments/',
+  annotationsPrefix: 'annotations/'
 } as const
 
 /** 当前（也是唯一）支持的包格式：必须「公钥 + 私钥」才能打开 */
 export const PACKAGE_FORMAT = 2
 export const PACKAGE_EXTENSION = 'minidiary'
-export const ATTACHMENT_MEMBER_RE =
+export const ANNOTATION_MEMBER_RE = /^annotations\/\d{4}-\d{2}-\d{2}\.ann$/
+
+const ATTACHMENT_MEMBER_RE =
   /^attachments\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.mdat$/i
 
 export type PackageManifest = z.infer<typeof migrationManifestSchema>
@@ -31,7 +34,16 @@ export function isAllowedPackageMember(name: string): boolean {
   ) {
     return true
   }
+  if (ANNOTATION_MEMBER_RE.test(name)) return true
   return ATTACHMENT_MEMBER_RE.test(name)
+}
+
+export function annotationMember(date: string): string {
+  return `${PACKAGE_MEMBER.annotationsPrefix}${date}.ann`
+}
+
+export function annotationDateFromMember(name: string): string | null {
+  return ANNOTATION_MEMBER_RE.test(name) ? name.slice(PACKAGE_MEMBER.annotationsPrefix.length, -4) : null
 }
 
 export function attachmentMember(id: string): string {
@@ -103,6 +115,3 @@ export function defaultPackageFileName(now = new Date()): string {
   return `Mini Diary 迁移包 ${year}-${month}-${day}.${PACKAGE_EXTENSION}`
 }
 
-export function isPackageFile(filePath: string): boolean {
-  return filePath.toLowerCase().endsWith(`.${PACKAGE_EXTENSION}`)
-}

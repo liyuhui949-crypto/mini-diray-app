@@ -17,7 +17,19 @@ import { freeSpaceCheck, vaultPaths } from '../vault/paths'
 import type { VaultRepository } from '../vault/repository'
 import { composePackageSecret } from '@shared/packageKey'
 
-import { attachmentMember, PACKAGE_FORMAT, PACKAGE_MEMBER, formatChecksums } from './package'
+import {
+  annotationMember,
+  attachmentMember,
+  PACKAGE_FORMAT,
+  PACKAGE_MEMBER,
+  formatChecksums
+} from './package'
+import {
+  annotationFile,
+  annotationKey,
+  listAnnotationDates,
+  readAnnotations
+} from '../vault/annotations'
 
 export interface MigrationExportDeps {
   repository: VaultRepository
@@ -79,6 +91,14 @@ export async function exportMigrationPackage(
     totalAttachmentBytes += stats.size
   }
 
+  // 批注：按文件原样入包（包内已有独立 AEAD，不需要重新加密）
+  const annotationKeyBuf = annotationKey(dek, envelope.vaultId)
+  const annotationDates = await listAnnotationDates(repository.vaultDir)
+  let annotationCount = 0
+  for (const date of annotationDates) {
+    annotationCount += (await readAnnotations(repository.vaultDir, date, annotationKeyBuf)).length
+  }
+
   const entries = data.entries
   const firstDate = entries.length > 0 ? entries[0]!.date : null
   const lastDate = entries.length > 0 ? entries[entries.length - 1]!.date : null
@@ -114,6 +134,7 @@ export async function exportMigrationPackage(
       vaultId: envelope.vaultId,
       entryCount: entries.length,
       attachmentCount: attachmentFiles.length,
+      annotationCount,
       totalAttachmentBytes,
       firstDate,
       lastDate,
@@ -138,6 +159,20 @@ export async function exportMigrationPackage(
     ]
 
     const pending: Promise<void>[] = []
+    for (const date of annotationDates) {
+      const member = annotationMember(date)
+      const counter = writer.addFileFromDisk(annotationFile(repository.vaultDir, date), member)
+      pending.push(
+        new Promise<void>((resolve, reject) => {
+          counter.stream.once('end', () => {
+            checksums.push({ member, sha256: counter.digest() })
+            resolve()
+          })
+          counter.stream.once('error', () => reject(new AppError('IO_ERROR', '读取批注失败')))
+        })
+      )
+    }
+
     let processed = 0
     for (const file of attachmentFiles) {
       const id = path.basename(file, '.mdat')

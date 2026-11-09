@@ -1,6 +1,7 @@
 import type { ZodType } from 'zod'
 
 import type {
+  Annotation,
   Attachment,
   BootstrapInfo,
   DiaryEntry,
@@ -17,11 +18,11 @@ import type {
   Preferences,
   StorageStats,
   ThemeSource,
-  UpdateStatus,
   VaultSnapshot
 } from './types'
 import type { ErrorPayload } from './errors'
 import {
+  ANNOTATION_BODY_MAX_LENGTH,
   entryDraftSchema,
   exportFormatSchema,
   importFormatSchema,
@@ -43,7 +44,6 @@ export const EVENTS = {
   jobProgress: 'job:progress',
   jobDone: 'job:done',
   jobError: 'job:error',
-  updateStatus: 'update:status',
   openPackage: 'migration:open-package'
 } as const
 
@@ -58,7 +58,6 @@ export interface EventPayloads {
   'job:progress': JobProgress
   'job:done': JobDonePayload
   'job:error': JobErrorPayload
-  'update:status': UpdateStatus
   'migration:open-package': { path: string }
 }
 
@@ -68,7 +67,6 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: ErrorPayl
 export interface IpcContract {
   'app:bootstrap': { req: void; res: BootstrapInfo }
   'app:flushAck': { req: { token: string }; res: void }
-  'app:checkForUpdates': { req: void; res: void }
   'app:openDiaryDir': { req: void; res: void }
   'shell:openExternal': { req: { url: string }; res: void }
   'app:copyText': { req: { text: string }; res: void }
@@ -85,7 +83,16 @@ export interface IpcContract {
     req: { entry: EntryDraft }
     res: { revision: number; entry: DiaryEntry | null; savedAt: string }
   }
-  'entry:delete': { req: { date: string }; res: { revision: number } }
+
+  /** 批注只增不改：没有 update / delete 通道 */
+  'annotation:add': {
+    req: { date: string; quote: string; tag: string; body: string }
+    res: {
+      annotation: Annotation
+      annotations: Annotation[]
+      revision: number
+    }
+  }
 
   'attachment:addFromPath': { req: { sourcePath: string }; res: Attachment }
   'attachment:addFromDialog': { req: void; res: Attachment | null }
@@ -168,8 +175,15 @@ export const requestValidators: RequestValidators = {
     z.object({ password: z.string().min(1).max(200) }).parse(payload) as IpcContract['vault:reset']['req'],
   'entry:save': (payload) =>
     z.object({ entry: entryDraftSchema }).parse(payload) as IpcContract['entry:save']['req'],
-  'entry:delete': (payload) =>
-    z.object({ date: localDateSchema }).parse(payload) as IpcContract['entry:delete']['req'],
+  'annotation:add': (payload) =>
+    z
+      .object({
+        date: localDateSchema,
+        quote: z.string().max(400),
+        tag: z.string().max(100),
+        body: z.string().min(1).max(ANNOTATION_BODY_MAX_LENGTH)
+      })
+      .parse(payload) as IpcContract['annotation:add']['req'],
   'attachment:addFromPath': (payload) =>
     z.object({ sourcePath: optionalString }).parse(payload) as IpcContract['attachment:addFromPath']['req'],
   'attachment:addBytes': (payload) =>

@@ -5,7 +5,9 @@ import { Transform } from 'node:stream'
 
 import { AppError } from '@shared/errors'
 import type {
+  Annotation,
   DiaryEntry,
+  LocalDate,
   MigrationSummary,
   PortablePreferences,
   VaultData
@@ -18,6 +20,12 @@ import { parseHeader, totalChunksFor } from '../attachments/format'
 import { AttachmentStore } from '../attachments/store'
 import { decryptMdatStream } from '../attachments/stream'
 import { ZipArchive } from '../core/zip'
+import {
+  annotationKey,
+  parseAnnotationText,
+  renumberAnnotations,
+  writeAnnotationFile
+} from '../vault/annotations'
 import { deriveAttachmentKey, randomUuid, type ScryptParams } from '../vault/crypto'
 import { pathExists, removePath, vaultPaths } from '../vault/paths'
 import { composePackageSecret, isValidPackageKey } from '@shared/packageKey'
@@ -25,6 +33,7 @@ import { openEnvelope, parseEnvelope, rewrapEnvelope, sealPayload, type VaultEnv
 import type { VaultRepository } from '../vault/repository'
 import {
   PACKAGE_MEMBER,
+  annotationDateFromMember,
   attachmentIdFromMember,
   isAllowedPackageMember,
   parseChecksums,
@@ -58,8 +67,11 @@ interface TokenRecord {
   packagePassword: string
   packageDek: Buffer
   packageAttachmentKey: Buffer
+  packageAnnotationKey: Buffer
   prefs: PortablePreferences | null
   attachments: PackageAttachmentMeta[]
+  /** 包内批注（已解密，导入时按目标密钥重加密） */
+  annotations: Array<{ date: LocalDate; records: Annotation[] }>
   summary: MigrationSummary
 }
 
@@ -166,6 +178,26 @@ export class MigrationImporter {
         throw new AppError('WRONG_PASSWORD', '公钥或私钥不正确')
       }
 
+      const annotations: Array<{ date: LocalDate; records: Annotation[] }> = []
+      let annotationCount = 0
+      const annotationFiles: string[] = []
+      for (const member of archive.names()) {
+        const date = annotationDateFromMember(member)
+        if (!date) continue
+        annotationFiles.push(member)
+        const text = (await archive.readBuffer(member, 64 * 1024 * 1024)).toString('utf8')
+        const expected = checksums.get(member)
+        if (expected) {
+          const actual = createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex')
+          if (actual !== expected) throw new AppError('CORRUPT_VAULT', `迁移包成员校验失败：${member}`)
+        }
+        const records = parseAnnotationText(date, text, annotationKey(opened.dek, envelope.vaultId))
+        if (records.length > 0) {
+          annotations.push({ date, records })
+          annotationCount += records.length
+        }
+      }
+
       const attachments: PackageAttachmentMeta[] = []
       for (const member of archive.names()) {
         const id = attachmentIdFromMember(member)
@@ -193,6 +225,7 @@ export class MigrationImporter {
         createdAt: manifest.createdAt,
         entryCount: entries.length,
         attachmentCount: attachments.length,
+        annotationCount,
         totalAttachmentBytes: attachments.reduce((sum, item) => sum + item.size, 0),
         firstDate: entries.length > 0 ? entries[0]!.date : manifest.firstDate,
         lastDate: entries.length > 0 ? entries[entries.length - 1]!.date : manifest.lastDate,
@@ -208,8 +241,10 @@ export class MigrationImporter {
         packagePassword,
         packageDek: opened.dek,
         packageAttachmentKey: deriveAttachmentKey(opened.dek, envelope.vaultId),
+        packageAnnotationKey: annotationKey(opened.dek, envelope.vaultId),
         prefs,
         attachments,
+        annotations,
         summary
       })
       logger.info('migration package previewed', {
@@ -229,6 +264,7 @@ export class MigrationImporter {
     record.packagePassword = ''
     record.packageDek.fill(0)
     record.packageAttachmentKey.fill(0)
+    record.packageAnnotationKey.fill(0)
   }
 
   /**
@@ -258,6 +294,7 @@ export class MigrationImporter {
     let rollbackDir: string | null = null
     let previousData: VaultData | null = null
     let attachmentsSwapped = false
+    let annotationsBackedUp = false
     const movedIn: string[] = []
 
     try {
@@ -350,17 +387,55 @@ export class MigrationImporter {
         }
 
         const now = new Date().toISOString()
+        // 4. 批注：合并时保留目标已有批注、包内记录重排 id；替换时只用包内的
+        const existingAnnotations = adoptPackageKey ? {} : repository.getSnapshot().annotations
+        const targetAnnotationKey = adoptPackageKey
+          ? record.packageAnnotationKey
+          : repository.getAnnotationKey()
+        const finalAnnotations: Record<string, Annotation[]> = {}
+        if (options.mode === 'merge') {
+          for (const [date, list] of Object.entries(existingAnnotations)) {
+            finalAnnotations[date] = [...list]
+          }
+        }
+        let annotationSeq = options.mode === 'merge' ? maxAnnotationSeq(existingAnnotations) : 0
+        for (const item of record.annotations) {
+          const records = renumberAnnotations(item.records, annotationSeq)
+          annotationSeq += records.length
+          finalAnnotations[item.date] =
+            options.mode === 'merge'
+              ? [...(finalAnnotations[item.date] ?? []), ...records]
+              : records
+        }
+
         const nextData: VaultData = {
           schemaVersion: record.data.schemaVersion,
           vaultId: adoptPackageKey ? record.envelope.vaultId : repository.getVaultId(),
           createdAt: adoptPackageKey ? record.data.createdAt : now,
           updatedAt: now,
-          entries: finalEntries
+          entries: finalEntries,
+          annotationSeq,
+          annotationDigests: {}
+        }
+
+        const writeAnnotations = async (dir: string): Promise<Record<string, string>> => {
+          const digests: Record<string, string> = {}
+          for (const [date, records] of Object.entries(finalAnnotations)) {
+            digests[date] = await writeAnnotationFile(
+              dir,
+              date,
+              records,
+              targetAnnotationKey
+            )
+          }
+          return digests
         }
 
         if (adoptPackageKey) {
           // 4a. 没有库 / 库被锁定：写新 vault（用包的私钥包裹），整套切换
-          job.report(0.9, '写入日记库…')
+          job.report(0.9, '写入批注…')
+          nextData.annotationDigests = await writeAnnotations(staging.root)
+          job.report(0.92, '写入日记库…')
           const password = unlockPassword as string
           const rewrapped = await rewrapEnvelope(
             record.envelope,
@@ -420,7 +495,16 @@ export class MigrationImporter {
             }
           }
 
+          // 批注目录整体重写（replace 丢弃旧批注，merge 保留并追加）
+          const annotationsDir = path.join(repository.vaultDir, 'annotations')
+          if (await pathExists(annotationsDir)) {
+            await fs.rename(annotationsDir, path.join(rollbackDir, 'annotations'))
+            annotationsBackedUp = true
+          }
+          nextData.annotationDigests = await writeAnnotations(repository.vaultDir)
+
           await repository.replaceAllWithCurrentKey(nextData)
+          await repository.reloadAnnotations()
           switched = true
         }
 
@@ -462,6 +546,14 @@ export class MigrationImporter {
             .rename(path.join(rollbackDir, 'attachments'), target.attachmentsDir)
             .catch(() => undefined)
         }
+        if (annotationsBackedUp) {
+          await fs
+            .rm(path.join(repository.vaultDir, 'annotations'), { recursive: true, force: true })
+            .catch(() => undefined)
+          await fs
+            .rename(path.join(rollbackDir, 'annotations'), path.join(repository.vaultDir, 'annotations'))
+            .catch(() => undefined)
+        }
         if (previousData && repository.isUnlocked) {
           await repository.replaceAllWithCurrentKey(previousData).catch(() => undefined)
         }
@@ -491,6 +583,17 @@ export class MigrationImporter {
     await fs.copyFile(vaultPaths(diaryDir).vaultFile, path.join(dir, 'diary.vault'))
     return dir
   }
+}
+
+function maxAnnotationSeq(annotations: Record<string, Annotation[]>): number {
+  let max = 0
+  for (const list of Object.values(annotations)) {
+    for (const item of list) {
+      const value = Number(item.id.slice(1))
+      if (Number.isInteger(value) && value > max) max = value
+    }
+  }
+  return max
 }
 
 async function readPrefix(stream: NodeJS.ReadableStream, length: number): Promise<Buffer> {

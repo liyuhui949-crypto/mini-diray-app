@@ -40,12 +40,34 @@ export interface DiaryEntry {
   updatedAt: string
 }
 
+/** 批注：与正文平行的第二条记录流，只增不改不删 */
+export interface Annotation {
+  /** 'n' + 库内单调递增序号 */
+  id: string
+  /** 所属日期，也是文件名 */
+  date: LocalDate
+  /** '' = 整篇批注（这一天没有正文可引用）；否则 ≤90 字符原文引文 */
+  quote: string
+  /** 自定义 tag（仅批注作用域），'' 允许 */
+  tag: string
+  /** 纯文本，不限长度 */
+  body: string
+  /** 展示用创建时刻 'MM-DD HH:mm' */
+  at: string
+  /** epoch ms，排序依据 */
+  createdAt: number
+}
+
 export interface VaultData {
   schemaVersion: number
   vaultId: string
   createdAt: string
   updatedAt: string
   entries: DiaryEntry[]
+  /** 已分配的批注序号；旧库没有该字段时从文件里推算 */
+  annotationSeq?: number
+  /** 每个日期批注文件的 SHA-256，用于发现历史批注被篡改 */
+  annotationDigests?: Record<string, string>
 }
 
 /** 解锁后返回给渲染进程的明文镜像；不含任何密钥 */
@@ -54,6 +76,8 @@ export interface VaultSnapshot {
   revision: number
   vaultId: string
   entries: DiaryEntry[]
+  /** 按日期分组的批注 */
+  annotations: Record<string, Annotation[]>
 }
 
 export type VaultStatus = 'missing' | 'locked' | 'unlocked'
@@ -74,6 +98,10 @@ export interface Preferences {
   lastOpenedDate: LocalDate | null
   lastImportDir: string | null
   lastExportDir: string | null
+  sidebarCollapsed?: boolean
+  /** 条目列表宽度（px），缺省 312 */
+  listWidth?: number
+  annotationCollapsed?: boolean
 }
 
 /** 迁移包内可移植的偏好子集（不含机器相关字段） */
@@ -114,6 +142,7 @@ export interface MigrationSummary {
   createdAt: string
   entryCount: number
   attachmentCount: number
+  annotationCount?: number
   totalAttachmentBytes: number
   firstDate: LocalDate | null
   lastDate: LocalDate | null
@@ -150,7 +179,6 @@ export type MenuCommand =
   | 'new-entry'
   | 'go-today'
   | 'search'
-  | 'lock'
   | 'open-preferences'
   | 'open-stats'
   | 'import-entry'
@@ -159,7 +187,6 @@ export type MenuCommand =
   | 'migration-import'
   | 'toggle-sidebar'
   | 'insert-attachment'
-  | 'check-for-updates'
 
 export type ThemeSource = 'system' | 'light' | 'dark'
 
@@ -180,11 +207,4 @@ export interface StorageStats {
   orphanCount: number
   orphanBytes: number
   vaultBytes: number
-}
-
-export interface UpdateStatus {
-  state: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
-  version?: string
-  percent?: number
-  message?: string
 }
