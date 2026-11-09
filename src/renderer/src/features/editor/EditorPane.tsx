@@ -8,21 +8,29 @@ import {
   List,
   ListOrdered,
   Lock,
+  MessageSquarePlus,
+  PanelsTopLeft,
   Paperclip,
   Trash2
 } from 'lucide-react'
 
 import { copy } from '@shared/copy'
+import { LARGE_FILE_CONFIRM_BYTES, PASTE_IMAGE_MAX_BYTES } from '@shared/limits'
 import { formatClockCN, formatDateWithWeekdayCN, relativeDayLabelCN } from '@shared/date'
-import type { Attachment } from '@shared/types'
+import type { Annotation, Attachment } from '@shared/types'
 import { formatBytes } from '@shared/date'
 import { countEntryWords } from '@shared/words'
 
 import { call, errorMessage, pathForFile } from '@/api/client'
 import { Button, Dialog, IconButton } from '@/components/ui'
+import {
+  AnnotationPane,
+  type AnnotationDraft
+} from '@/features/annotations/AnnotationPane'
+import annStyles from '@/features/annotations/annotations.module.scss'
 import { useToday } from '@/hooks/useToday'
 import { useEntriesStore } from '@/stores/entries'
-import { usePrefsStore } from '@/stores/prefs'
+import { persistLayout, usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 
 import { CodeMirrorEditor, type EditorHandle } from './CodeMirrorEditor'
@@ -31,7 +39,20 @@ import { TagEditor } from './TagEditor'
 import { attachmentMarkdown } from './markdownCommands'
 import styles from './editor.module.scss'
 
-const HUGE_FILE_BYTES = 300 * 1024 * 1024
+
+/** 在给定容器里读取选中的文字与位置（预览模式下用） */
+function readSelectionIn(container: HTMLElement | null): { text: string; rect: DOMRect } | null {
+  if (!container) return null
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null
+  const range = selection.getRangeAt(0)
+  if (!container.contains(range.commonAncestorContainer)) return null
+  const text = selection.toString().trim()
+  if (!text) return null
+  const rect = range.getBoundingClientRect()
+  if (!rect.width && !rect.height) return null
+  return { text, rect }
+}
 
 export function EditorPane(): React.JSX.Element {
   const draft = useEntriesStore((state) => state.draft)
@@ -47,6 +68,8 @@ export function EditorPane(): React.JSX.Element {
   const today = useToday()
 
   const preview = useUiStore((state) => state.previewMode)
+  const annotationCollapsed = useUiStore((state) => state.annotationCollapsed)
+  const setAnnotationCollapsed = useUiStore((state) => state.setAnnotationCollapsed)
   const setPreviewMode = useUiStore((state) => state.setPreviewMode)
   const searchJump = useUiStore((state) => state.searchJump)
   const [highlightQuery, setHighlightQuery] = useState<string | null>(null)
@@ -60,15 +83,43 @@ export function EditorPane(): React.JSX.Element {
   const editorRef = useRef<EditorHandle>(null)
   const titleRef = useRef<HTMLInputElement>(null)
 
-  const readOnly = Boolean(prefs && !prefs.allowFutureEntries && activeDate > today)
   const allowFuture = prefs?.allowFutureEntries ?? false
+  const annotationsByDate = useEntriesStore((state) => state.annotations)
+  const addAnnotation = useEntriesStore((state) => state.addAnnotation)
+  const annotations = annotationsByDate[activeDate] ?? []
+  /** 历史日期（非今天）：正文封存，只允许批注 */
+  const sealed = activeDate !== today
+  const writable = !sealed || (allowFuture && activeDate > today)
+  const readOnly = !writable
+  const [annotationDraft, setAnnotationDraft] = useState<AnnotationDraft | null>(null)
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)
+  const [selectionBar, setSelectionBar] = useState<{ text: string; rect: DOMRect } | null>(null)
+  const [savingAnnotation, setSavingAnnotation] = useState(false)
+  const previewRef = useRef<HTMLDivElement | null>(null)
 
   // 只重置「这一天是否已开始写」，预览/源码模式按用户习惯跨日记保留
   useEffect(() => {
     setStarted(false)
     setHighlightQuery(null)
     setHitCount(0)
+    // 切日期：编辑区收起、草稿放弃、浮条消失
+    setAnnotationDraft(null)
+    setActiveAnnotationId(null)
+    setSelectionBar(null)
   }, [activeDate])
+
+  // 预览正文里选中文字 → 浮出「加批注」
+  useEffect(() => {
+    const host = previewRef.current
+    if (!host || !preview) return
+    const show = (): void => setSelectionBar(readPreviewSelection())
+    host.addEventListener('mouseup', show)
+    host.addEventListener('keyup', show)
+    return () => {
+      host.removeEventListener('mouseup', show)
+      host.removeEventListener('keyup', show)
+    }
+  }, [preview])
 
   // 「在日记中打开」：等这一天的草稿就位后再给编辑器下高亮指令
   useEffect(() => {
@@ -105,6 +156,96 @@ export function EditorPane(): React.JSX.Element {
     draft.attachments.length === 0
 
   const showEmptyState = blank && !started && !readOnly
+  const futureBlocked = activeDate > today && !allowFuture
+  const paneVisible = sealed || annotations.length > 0 || annotationDraft !== null
+  const readPreviewSelection = (): { text: string; rect: DOMRect } | null =>
+    readSelectionIn(previewRef.current)
+  const updateSelectionBar = (event: React.SyntheticEvent): void => {
+    const target = event.target as HTMLElement
+    if (target.closest('aside, input, textarea, [data-sel-bar]')) return
+    setSelectionBar(leftmostSelection())
+  }
+
+  const onPreviewClick = (event: React.MouseEvent<HTMLDivElement>): void => {
+    const mark = (event.target as HTMLElement).closest<HTMLElement>('.ann-mark')
+    const id = mark?.getAttribute('data-ann-id')
+    if (id) focusAnnotation(id)
+  }
+
+  const leftmostSelection = (): { text: string; rect: DOMRect } | null => {
+    const fromPreview = readPreviewSelection()
+    if (fromPreview) return fromPreview
+    return editorRef.current?.getSelection() ?? null
+  }
+
+  const openCompose = (quote: string): void => {
+    if (annotationCollapsed) {
+      setAnnotationCollapsed(false)
+      persistLayout({ annotationCollapsed: false })
+    }
+    setAnnotationDraft({ quote: quote.trim().slice(0, 90), tag: '', body: '' })
+    setSelectionBar(null)
+    window.getSelection()?.removeAllRanges()
+  }
+
+  const composeFromSelection = (): void => {
+    const selection = leftmostSelection()
+    if (selection) {
+      openCompose(selection.text)
+      return
+    }
+    if (draft.body.trim() || draft.title.trim()) {
+      pushToast(copy.annotations.needSelection)
+      return
+    }
+    openCompose('')
+  }
+
+  const revealAnchor = (id: string): void => {
+    const anchor = document.querySelector<HTMLElement>(
+      `.ann-mark[data-ann-id="${id}"], .cmAnn[data-ann-id="${id}"]`
+    )
+    anchor?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (anchor?.classList.contains('ann-mark')) {
+      anchor.classList.add('flash')
+      window.setTimeout(() => anchor.classList.remove('flash'), 1300)
+    }
+  }
+
+  const selectAnnotation = (annotation: Annotation): void => {
+    setActiveAnnotationId(annotation.id)
+    revealAnchor(annotation.id)
+  }
+
+  const focusAnnotation = (id: string): void => {
+    setActiveAnnotationId(id)
+    const card = document.querySelector<HTMLElement>(`[data-annotation-card="${id}"]`)
+    card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+
+  const saveAnnotation = async (): Promise<void> => {
+    if (!annotationDraft) return
+    if (!annotationDraft.body.trim()) {
+      pushToast(copy.annotations.contentRequired, { tone: 'error' })
+      return
+    }
+    setSavingAnnotation(true)
+    try {
+      const created = await addAnnotation({
+        date: activeDate,
+        quote: annotationDraft.quote,
+        tag: annotationDraft.tag,
+        body: annotationDraft.body
+      })
+      setAnnotationDraft(null)
+      setActiveAnnotationId(created.id)
+      pushToast(copy.annotations.saved)
+    } catch (error) {
+      pushToast(errorMessage(error), { tone: 'error' })
+    } finally {
+      setSavingAnnotation(false)
+    }
+  }
 
   const attachToEntry = (attachment: Attachment): void => {
     const store = useEntriesStore.getState()
@@ -117,7 +258,7 @@ export function EditorPane(): React.JSX.Element {
   }
 
   const uploadPath = async (sourcePath: string, size?: number): Promise<void> => {
-    if (size && size > HUGE_FILE_BYTES) {
+    if (size && size > LARGE_FILE_CONFIRM_BYTES) {
       setPendingHuge({ path: sourcePath, size })
       return
     }
@@ -161,7 +302,7 @@ export function EditorPane(): React.JSX.Element {
     const file = item?.getAsFile()
     if (!file) return
     event.preventDefault()
-    if (file.size > 50 * 1024 * 1024) {
+    if (file.size > PASTE_IMAGE_MAX_BYTES) {
       pushToast(copy.attachments.pasteTooLarge, { tone: 'error' })
       return
     }
@@ -197,8 +338,9 @@ export function EditorPane(): React.JSX.Element {
   })()
 
   return (
-    <div className={styles.pane}>
-      <div className={styles.scroll}>
+    <div className={styles.pane} onMouseUp={updateSelectionBar} onKeyUp={updateSelectionBar}>
+      <div className={styles.split}>
+        <div className={styles.scroll}>
         <article className={styles.doc}>
           <div className={styles.tools}>
             <IconButton
@@ -238,6 +380,15 @@ export function EditorPane(): React.JSX.Element {
               {preview ? <Code2 size={14} /> : <Eye size={14} />}
               {preview ? copy.editor.source : copy.editor.preview}
             </button>
+            <button
+              type="button"
+              className={styles.tool}
+              onClick={composeFromSelection}
+              disabled={futureBlocked}
+            >
+              <MessageSquarePlus size={14} />
+              {copy.annotations.add}
+            </button>
             <span className={styles.spacer} />
             <button
               type="button"
@@ -253,12 +404,16 @@ export function EditorPane(): React.JSX.Element {
           <div className={styles.dateLine}>
             <span>{formatDateWithWeekdayCN(activeDate)}</span>
             <span className={styles.pill}>{relativeDayLabelCN(activeDate, today)}</span>
+            {sealed ? (
+              <span className={annStyles.readOnlyFlag}>
+                <Lock size={12} /> {copy.annotations.readOnly}
+              </span>
+            ) : null}
           </div>
 
           {showEmptyState ? (
             <div className={styles.empty}>
               <p className={styles.emptyTitle}>{copy.editor.emptyTitle}</p>
-              <p className={styles.emptySub}>{copy.editor.emptySubtitle}</p>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -272,6 +427,13 @@ export function EditorPane(): React.JSX.Element {
                 }}
               >
                 {copy.editor.startWriting}
+              </Button>
+            </div>
+          ) : sealed && blank ? (
+            <div className={annStyles.sealed}>
+              <b>{copy.annotations.sealedTitle}</b>
+              <Button variant="primary" size="sm" onClick={() => openCompose('')}>
+                {copy.annotations.sealedAction}
               </Button>
             </div>
           ) : (
@@ -298,17 +460,20 @@ export function EditorPane(): React.JSX.Element {
                 onChange={(tags) => updateDraft({ tags })}
               />
 
-              {readOnly ? (
+              {futureBlocked ? (
                 <div className={styles.readonly}>
                   <Lock size={14} />
                   <div>
                     <p>{copy.editor.futureReadonly}</p>
-                    <p className={styles.readonlyHint}>{copy.editor.futureReadonlyHint}</p>
                   </div>
                 </div>
               ) : preview ? (
-                <div className={styles.previewWrap}>
-                  <MarkdownPreview body={draft.body} attachments={draft.attachments} />
+                <div className={styles.previewWrap} ref={previewRef} onClick={onPreviewClick}>
+                  <MarkdownPreview
+                    body={draft.body}
+                    attachments={draft.attachments}
+                    annotations={annotations}
+                  />
                 </div>
               ) : (
                 <div
@@ -328,8 +493,11 @@ export function EditorPane(): React.JSX.Element {
                   <CodeMirrorEditor
                     value={draft.body}
                     onChange={(body) => updateDraft({ body })}
+                    readOnly={readOnly}
                     placeholderText={copy.editor.emptyStatePlaceholder}
                     handleRef={editorRef}
+                    annotations={annotations}
+                    onAnnotationClick={focusAnnotation}
                     highlightQuery={highlightQuery}
                     onHighlightCount={(count) => {
                       setHitCount(count)
@@ -372,28 +540,88 @@ export function EditorPane(): React.JSX.Element {
           )}
 
           {busyPath ? <p className={styles.busy}>{copy.attachments.uploading(0)}</p> : null}
-          {allowFuture && activeDate > today ? (
-            <p className={styles.busy}>{copy.editor.futureReadonlyHint}</p>
-          ) : null}
-        </article>
+          </article>
+        </div>
+
+        {paneVisible && !annotationCollapsed ? (
+          <AnnotationPane
+            annotations={annotations}
+            body={draft.body}
+            preview={preview}
+            draft={annotationDraft}
+            busy={savingAnnotation}
+            activeId={activeAnnotationId}
+            onDraftChange={(patch) =>
+              setAnnotationDraft((current) => (current ? { ...current, ...patch } : current))
+            }
+            onCancel={() => setAnnotationDraft(null)}
+            onSave={() => void saveAnnotation()}
+            onPick={selectAnnotation}
+          />
+        ) : null}
+        {paneVisible && annotationCollapsed ? (
+          <button
+            type="button"
+            className={annStyles.drawer}
+            title={copy.annotations.expand}
+            aria-label={copy.annotations.expand}
+            onClick={() => {
+              setAnnotationCollapsed(false)
+              persistLayout({ annotationCollapsed: false })
+            }}
+          >
+            <PanelsTopLeft size={14} />
+            <span>{copy.annotations.title}</span>
+            {annotations.length > 0 ? <b>{annotations.length}</b> : null}
+          </button>
+        ) : null}
       </div>
 
+      {selectionBar && !annotationDraft ? (
+        <div
+          data-sel-bar="true"
+          className={annStyles.selBar}
+          style={{
+            left: `${Math.min(
+              Math.max(8, selectionBar.rect.left + selectionBar.rect.width / 2 - 60),
+              window.innerWidth - 140
+            )}px`,
+            top: `${Math.max(8, selectionBar.rect.top - 40)}px`
+          }}
+        >
+          <button type="button" onClick={() => openCompose(selectionBar.text)}>
+            <MessageSquarePlus size={11} />
+            {copy.annotations.selectAction}
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.statusbar}>
-        <span>{copy.editor.wordCount(wordCount)}</span>
+        <span>
+          {sealed
+            ? draft.body.trim() || draft.title.trim()
+              ? copy.annotations.statusSealed(annotations.length)
+              : copy.annotations.statusSealedEmpty(annotations.length)
+            : copy.editor.wordCount(wordCount)}
+        </span>
         {highlightQuery && hitCount > 0 ? (
           <>
             <span className={styles.sep} />
             <span className={styles.hitChip}>{copy.search.hitCount(hitCount)}</span>
           </>
         ) : null}
-        <span className={styles.sep} />
-        <span
-          className={`${styles.saveState} ${saveState === 'dirty' ? styles.saveDirty : ''} ${
-            saveState === 'error' ? styles.saveError : ''
-          }`}
-        >
-          {statusText}
-        </span>
+        {sealed ? null : (
+          <>
+            <span className={styles.sep} />
+            <span
+              className={`${styles.saveState} ${saveState === 'dirty' ? styles.saveDirty : ''} ${
+                saveState === 'error' ? styles.saveError : ''
+              }`}
+            >
+              {statusText}
+            </span>
+          </>
+        )}
         <span className={styles.spacer} />
         <span className={styles.enc}>
           <Lock size={12} /> AES-256-GCM

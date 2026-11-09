@@ -1,11 +1,23 @@
-// 检索命中高亮：预览对话框与编辑器共用同一套观感
-mark.mdHit,
-.cmHit {
-  background: var(--md-accent-soft);
-  color: var(--md-text-primary);
+@use './hitMark' as hit;
+
+// 批注锚点：土黄虚线 + 浅底，点它跳到右侧卡片
+.ann-mark {
+  text-decoration: underline dashed var(--md-ann);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  background: linear-gradient(to bottom, transparent 64%, var(--md-ann-soft) 64%);
   border-radius: 2px;
-  padding: 0 1px;
-  box-shadow: inset 0 -1px 0 var(--md-accent);
+  cursor: pointer;
+  transition: background var(--md-dur) var(--md-ease);
+
+  &:hover {
+    background: var(--md-ann-soft);
+  }
+}
+
+// 检索命中高亮：所有 <mark> 统一用这个全局类
+.hitMark {
+  @include hit.hit-mark;
 }
 
 // Markdown 预览：与原型 .doc-body 的排版保持一致
@@ -122,16 +134,5 @@ mark.mdHit,
   th {
     background: var(--md-bg-sunken);
     font-weight: 600;
-  }
-}
-
-
-.searchDoc {
-  font-size: 14px;
-  line-height: 1.9;
-
-  .mdPara,
-  p {
-    margin: 0 0 12px;
   }
 }

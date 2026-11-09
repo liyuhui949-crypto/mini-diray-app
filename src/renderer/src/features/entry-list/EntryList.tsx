@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import { Paperclip, Plus } from 'lucide-react'
+import { MessageSquare, Paperclip } from 'lucide-react'
 
 import { copy } from '@shared/copy'
 import {
@@ -9,12 +9,13 @@ import {
   highlightSegments,
   type HighlightSegment
 } from '@shared/search'
-import { formatMonthDayWithWeekdayCN, monthOf, todayLocalDate } from '@shared/date'
+import { formatMonthDayWithWeekdayCN, monthOf } from '@shared/date'
 import type { DiaryEntry } from '@shared/types'
 import { countEntryWords, deriveTitle, makeSnippet } from '@shared/words'
 
+import { ColumnResizer } from '@/components/ui/ColumnResizer'
 import { useEntriesStore } from '@/stores/entries'
-import { usePrefsStore } from '@/stores/prefs'
+import { persistLayout, usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 
 import styles from './list.module.scss'
@@ -26,10 +27,12 @@ interface ListItem {
   /** 检索结果用结构化片段（最多两条，带高亮段） */
   snippets?: HighlightSegment[][]
   attachments: number
+  annotations: number
 }
 
-export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Element {
+export function EntryList(): React.JSX.Element {
   const entries = useEntriesStore((state) => state.entries)
+  const annotationsByDate = useEntriesStore((state) => state.annotations)
   const activeDate = useEntriesStore((state) => state.activeDate)
   const query = useEntriesStore((state) => state.searchQuery)
   const tag = useEntriesStore((state) => state.activeTag)
@@ -41,6 +44,8 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
   const calendarMonth = useUiStore((state) => state.calendarMonth)
   const listScope = useUiStore((state) => state.listScope)
   const setListScope = useUiStore((state) => state.setListScope)
+  const listWidth = useUiStore((state) => state.listWidth)
+  const setListWidth = useUiStore((state) => state.setListWidth)
 
   const hideTitle = prefs?.hideTitle ?? false
   const searching = query.trim().length > 0
@@ -63,7 +68,8 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
             ? deriveTitle('', entry.body) || copy.list.untitled
             : entry.title || copy.list.untitled,
           snippet: makeSnippet(entry.body, entry.title),
-          attachments: entry.attachments.length
+          attachments: entry.attachments.length,
+          annotations: annotationsByDate[entry.date]?.length ?? 0
         }))
 
     // 搜索与标签是"全库"视图；只有普通列表跟随日历月份
@@ -76,12 +82,13 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
         title: hideTitle ? '' : hit.entry.title.trim(),
         snippet: hit.snippets[0]?.text ?? '',
         snippets: hit.snippets.map((snippet) => snippet.segments),
-        attachments: hit.entry.attachments.length
+        attachments: hit.entry.attachments.length,
+        annotations: annotationsByDate[hit.entry.date]?.length ?? 0
       }))
     }
     if (tag) return toDesc(filterByTag(entries, tag))
     return toDesc(scopedEntries)
-  }, [entries, searching, query, tag, hideTitle, scopedEntries])
+  }, [entries, searching, query, tag, hideTitle, scopedEntries, annotationsByDate])
 
   const totalWords = useMemo(
     () =>
@@ -109,29 +116,10 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
   const showScopeToggle = !searching && !tag
 
   return (
-    <section
-      className={styles.list}
-      data-testid="entry-list"
-      data-collapsed={collapsed}
-      aria-hidden={collapsed}
-    >
+    <section className={styles.list} data-testid="entry-list">
       <header className={styles.head}>
         <div className={styles.headRow}>
           <h2>{heading}</h2>
-          <button
-            type="button"
-            className={styles.newBtn}
-            title={copy.list.newEntry}
-            onClick={() => {
-              setView('editor')
-              void openDate(todayLocalDate())
-            }}
-          >
-            <Plus size={14} /> {copy.list.newEntry}
-          </button>
-        </div>
-        <div className={styles.metaRow}>
-          <span className={styles.meta}>{meta}</span>
           {showScopeToggle ? (
             <div className={styles.scope} role="group" aria-label={copy.list.scopeHint}>
               <button
@@ -149,7 +137,11 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
                 {copy.list.scopeAll}
               </button>
             </div>
-          ) : (
+          ) : null}
+        </div>
+        <div className={styles.metaRow}>
+          <span className={styles.meta}>{meta}</span>
+          {showScopeToggle ? null : (
             <span className={styles.scopeHint}>{copy.list.allScopeHint}</span>
           )}
         </div>
@@ -166,10 +158,7 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
             ) : tag || listScope === 'all' ? (
               <p>{copy.list.emptyAll}</p>
             ) : (
-              <>
-                <p>{copy.list.empty}</p>
-                <p>{copy.list.emptyMonthHint}</p>
-              </>
+              <p>{copy.list.empty}</p>
             )}
           </div>
         ) : (
@@ -198,6 +187,12 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
                       {item.attachments}
                     </span>
                   ) : null}
+                  {item.annotations > 0 ? (
+                    <span className={styles.annBadge}>
+                      <MessageSquare size={9} />
+                      {copy.annotations.badge(item.annotations)}
+                    </span>
+                  ) : null}
                 </div>
                 {item.title ? (
                   <div className={styles.itemTitle}>
@@ -209,7 +204,7 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
                     <div key={`${item.date}-snippet-${index}`} className={styles.itemSnippet}>
                       {segments.map((segment, segIndex) =>
                         segment.match ? (
-                          <mark key={segIndex} className={styles.hit}>
+                          <mark key={segIndex} className="hitMark">
                             {segment.text}
                           </mark>
                         ) : (
@@ -234,6 +229,17 @@ export function EntryList({ collapsed }: { collapsed: boolean }): React.JSX.Elem
           清除标签筛选
         </button>
       ) : null}
+      <ColumnResizer
+        side="right"
+        value={listWidth}
+        min={240}
+        max={420}
+        label={copy.list.widthHandle}
+        onChange={setListWidth}
+        onCommit={(width) => {
+          persistLayout({ listWidth: width })
+        }}
+      />
     </section>
   )
 }

@@ -25,6 +25,8 @@ interface CalendarPaneProps {
   today: LocalDate
   selected: LocalDate
   entries: readonly DiaryEntry[]
+  /** 有批注的日期与条数（与"有日记"绿点区分：仅批注显示红点） */
+  annotations: Record<string, readonly unknown[]>
   allowFutureEntries: boolean
   onCursorChange: (date: LocalDate) => void
   onSelect: (date: LocalDate) => void
@@ -35,12 +37,14 @@ export function CalendarPane({
   today,
   selected,
   entries,
+  annotations,
   allowFutureEntries,
   onCursorChange,
   onSelect
 }: CalendarPaneProps): React.JSX.Element {
   const gridRef = useRef<HTMLDivElement | null>(null)
   const cells = useMemo(() => buildCalendarGrid(cursor, today), [cursor, today])
+  const annotationCount = (date: LocalDate): number => annotations[date]?.length ?? 0
   const datesWithContent = useMemo(() => {
     const set = new Set<LocalDate>()
     for (const entry of entries) {
@@ -147,7 +151,11 @@ export function CalendarPane({
             cell.inMonth ? '' : styles.out,
             cell.isToday ? styles.today : '',
             isSelected ? styles.selected : '',
-            datesWithContent.has(cell.date) ? styles.hasContent : '',
+            datesWithContent.has(cell.date)
+              ? styles.hasContent
+              : annotationCount(cell.date) > 0
+                ? styles.hasAnnotation
+                : '',
             disabled ? styles.future : ''
           ]
             .filter(Boolean)
@@ -163,7 +171,24 @@ export function CalendarPane({
               data-active={isSelected}
               tabIndex={isSelected ? 0 : -1}
               disabled={disabled}
-              aria-label={`${formatDateCN(cell.date)}${datesWithContent.has(cell.date) ? '，有日记' : ''}${disabled ? '，未来日期' : ''}`}
+              aria-label={`${formatDateCN(cell.date)}${
+                datesWithContent.has(cell.date)
+                  ? annotationCount(cell.date) > 0
+                    ? `，有日记 · ${annotationCount(cell.date)} 条批注`
+                    : '，有日记'
+                  : annotationCount(cell.date) > 0
+                    ? `${annotationCount(cell.date)} 条批注 · 无正文`
+                    : ''
+              }${disabled ? '，未来日期' : ''}`}
+              title={
+                datesWithContent.has(cell.date)
+                  ? annotationCount(cell.date) > 0
+                    ? `有日记 · ${annotationCount(cell.date)} 条批注`
+                    : '有日记'
+                  : annotationCount(cell.date) > 0
+                    ? `${annotationCount(cell.date)} 条批注 · 无正文`
+                    : undefined
+              }
               aria-selected={isSelected}
               onClick={() => {
                 if (disabled) return

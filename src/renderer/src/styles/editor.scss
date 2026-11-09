@@ -1,5 +1,18 @@
 // CodeMirror 6：把 Markdown 源码排成"像日记正文"的样子
 .cmEditor {
+  .cmAnn {
+    text-decoration: underline dashed var(--md-ann);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, transparent 64%, var(--md-ann-soft) 64%);
+    cursor: pointer;
+  }
+
+  .cmAnn:hover {
+    background: var(--md-ann-soft);
+  }
+
   .cmHit {
     background: var(--md-accent-soft);
     border-radius: 2px;

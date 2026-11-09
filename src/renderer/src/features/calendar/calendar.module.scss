@@ -65,7 +65,8 @@
   font-weight: 500;
 }
 
-.hasContent::after {
+.hasContent::after,
+.hasAnnotation::after {
   content: '';
   position: absolute;
   bottom: 4px;
@@ -73,6 +74,11 @@
   height: 3px;
   border-radius: 50%;
   background: var(--md-accent);
+}
+
+/* 仅批注（没有正文）用红点，与"有日记"区分 */
+.hasAnnotation::after {
+  background: var(--md-danger);
 }
 
 .selected {
@@ -85,7 +91,8 @@
     background: var(--md-accent);
   }
 
-  &.hasContent::after {
+  &.hasContent::after,
+  &.hasAnnotation::after {
     background: var(--md-accent-fg);
   }
 }

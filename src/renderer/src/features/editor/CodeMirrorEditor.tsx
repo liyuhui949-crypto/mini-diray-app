@@ -16,6 +16,7 @@ import {
 import { tags as lezerTags } from '@lezer/highlight'
 
 import { highlightSegments } from '@shared/search'
+import type { Annotation } from '@shared/types'
 
 import { applyCommand, insertAtSelection, type CommandKind } from './markdownCommands'
 
@@ -23,6 +24,8 @@ export interface EditorHandle {
   focus: () => void
   insertText: (text: string) => void
   runCommand: (command: CommandKind) => void
+  /** 当前选区文本与屏幕位置（用于"选中文字 → 加批注"浮条） */
+  getSelection: () => { text: string; rect: DOMRect } | null
 }
 
 interface CodeMirrorEditorProps {
@@ -34,6 +37,9 @@ interface CodeMirrorEditorProps {
   /** 检索跳转：把命中的词标出来（只读覆盖层，用户一输入就清除） */
   highlightQuery?: string | null
   onHighlightCount?: (count: number) => void
+  /** 批注锚点：引文在源码里也画出虚线底纹 */
+  annotations?: readonly Annotation[]
+  onAnnotationClick?: (id: string) => void
 }
 
 const highlightStyle = HighlightStyle.define([
@@ -91,6 +97,49 @@ const highlightField = StateField.define<{ deco: DecorationSet; count: number }>
   provide: (field) => EditorView.decorations.from(field, (value) => value.deco)
 })
 
+/** 批注锚点装饰层：正文或批注变化时重算 */
+const setAnnotationsEffect = StateEffect.define<readonly Annotation[]>()
+
+function buildAnnotationDecorations(doc: string, annotations: readonly Annotation[]): DecorationSet {
+  const ranges: ReturnType<Decoration['range']>[] = []
+  for (const annotation of annotations) {
+    if (!annotation.quote) continue
+    let index = doc.indexOf(annotation.quote)
+    while (index !== -1) {
+      ranges.push(
+        Decoration.mark({
+          class: 'cmAnn',
+          attributes: { 'data-ann-id': annotation.id, title: annotation.tag || '批注' }
+        }).range(index, index + annotation.quote.length)
+      )
+      index = doc.indexOf(annotation.quote, index + annotation.quote.length)
+    }
+  }
+  return Decoration.set(ranges, true)
+}
+
+const annotationField = StateField.define<{
+  annotations: readonly Annotation[]
+  deco: DecorationSet
+}>({
+  create: () => ({ annotations: [], deco: Decoration.none }),
+  update(value, tr) {
+    let annotations = value.annotations
+    let changed = false
+    for (const effect of tr.effects) {
+      if (effect.is(setAnnotationsEffect)) {
+        annotations = effect.value
+        changed = true
+      }
+    }
+    if (tr.docChanged || changed) {
+      return { annotations, deco: buildAnnotationDecorations(tr.state.doc.toString(), annotations) }
+    }
+    return value
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.deco)
+})
+
 const readOnlyCompartment = new Compartment()
 const placeholderCompartment = new Compartment()
 
@@ -131,7 +180,9 @@ export function CodeMirrorEditor({
   placeholderText = '',
   handleRef,
   highlightQuery = null,
-  onHighlightCount
+  onHighlightCount,
+  annotations = [],
+  onAnnotationClick
 }: CodeMirrorEditorProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -140,6 +191,8 @@ export function CodeMirrorEditor({
   onChangeRef.current = onChange
   const onCountRef = useRef(onHighlightCount)
   onCountRef.current = onHighlightCount
+  const onAnnotationClickRef = useRef(onAnnotationClick)
+  onAnnotationClickRef.current = onAnnotationClick
 
   useEffect(() => {
     const host = hostRef.current
@@ -155,6 +208,17 @@ export function CodeMirrorEditor({
       readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
       contentAttributes,
       highlightField,
+      annotationField,
+      EditorView.domEventHandlers({
+        mousedown: (event) => {
+          const target = event.target as HTMLElement | null
+          const mark = target?.closest?.('.cmAnn')
+          const id = mark?.getAttribute('data-ann-id')
+          if (!id) return false
+          onAnnotationClickRef.current?.(id)
+          return true
+        }
+      }),
       placeholderCompartment.of(placeholderText ? placeholderExtension(placeholderText) : []),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return
@@ -244,6 +308,13 @@ export function CodeMirrorEditor({
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
+    view.dispatch({ effects: setAnnotationsEffect.of(annotations) })
+    // 批注列表变化时只需重算装饰层，不动光标与内容
+  }, [annotations])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
     view.dispatch({ effects: setHighlightEffect.of(highlightQuery) })
     const count = view.state.field(highlightField).count
     onCountRef.current?.(count)
@@ -266,6 +337,24 @@ export function CodeMirrorEditor({
         const view = viewRef.current
         if (!view || readOnly) return
         runCommandOnView(view, command)
+      },
+      getSelection: () => {
+        const view = viewRef.current
+        if (!view) return null
+        const selection = view.state.selection.main
+        if (selection.empty) return null
+        const text = view.state.doc.sliceString(selection.from, selection.to).trim()
+        if (!text) return null
+        const start = view.coordsAtPos(selection.from)
+        const end = view.coordsAtPos(selection.to)
+        if (!start || !end) return null
+        const rect = new DOMRect(
+          Math.min(start.left, end.left),
+          Math.min(start.top, end.top),
+          Math.abs(end.left - start.left),
+          Math.max(18, Math.abs(end.bottom - start.bottom))
+        )
+        return { text, rect }
       }
     }),
     [readOnly]
