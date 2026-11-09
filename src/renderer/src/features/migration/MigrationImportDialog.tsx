@@ -132,7 +132,6 @@ export function MigrationImportDialog({
       }}
       width={580}
       title={title}
-      description={step === 'pick' ? copy.migration.importSubtitle : undefined}
       footer={
         step === 'done' ? (
           <Button variant="primary" onClick={onClose}>
@@ -252,11 +251,6 @@ export function MigrationImportDialog({
               : copy.migration.importModeMergeDesc}
           </p>
 
-          <p className={styles.hint}>
-            {status === 'unlocked'
-              ? copy.migration.keepPasswordHint
-              : copy.migration.packagePasswordUnlockHint}
-          </p>
           {error ? <p className={uiStyles.error}>{error}</p> : null}
         </div>
       ) : null}

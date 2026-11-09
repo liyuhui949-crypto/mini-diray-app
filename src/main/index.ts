@@ -80,9 +80,14 @@ function applyContentSecurityPolicy(): void {
     })
   })
 
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false)
+  // 只放行 HTML 全屏（视频播放器需要）；其余权限一律拒绝
+  const allowed = new Set(['fullscreen'])
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(allowed.has(permission))
   })
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission) => allowed.has(permission)
+  )
 }
 
 let context: AppContext | null = null

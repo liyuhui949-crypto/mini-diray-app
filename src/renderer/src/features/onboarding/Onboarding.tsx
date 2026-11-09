@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Lock, PackageOpen } from 'lucide-react'
 
 import { copy } from '@shared/copy'
+import { PASSWORD_MIN_LENGTH } from '@shared/schemas'
 
 import { call, errorMessage } from '@/api/client'
 import { PasswordInput } from '@/components/ui'
@@ -43,7 +44,7 @@ export function Onboarding(): React.JSX.Element {
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault()
     setError(null)
-    if (password.length < 8) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       setError(copy.onboarding.passwordTooShort)
       return
     }

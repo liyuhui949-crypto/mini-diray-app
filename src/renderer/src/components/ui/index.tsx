@@ -168,15 +168,6 @@ export function Select({ options, className, ...rest }: SelectProps): React.JSX.
   )
 }
 
-export function Spinner({ label }: { label?: string }): React.JSX.Element {
-  return (
-    <span className={styles.spinnerWrap} role="status" aria-live="polite">
-      <span className={styles.spinner} aria-hidden="true" />
-      {label ? <span className={styles.spinnerLabel}>{label}</span> : null}
-    </span>
-  )
-}
-
 interface ProgressProps {
   value: number
   label: string
@@ -202,23 +193,6 @@ export function Progress({ value, label, detail }: ProgressProps): React.JSX.Ele
         <span>{label}</span>
         <em>{detail ?? `${percent}%`}</em>
       </div>
-    </div>
-  )
-}
-
-interface EmptyStateProps {
-  title: string
-  subtitle?: string
-  action?: ReactNode
-  compact?: boolean
-}
-
-export function EmptyState({ title, subtitle, action, compact }: EmptyStateProps): React.JSX.Element {
-  return (
-    <div className={compact ? styles.emptyCompact : styles.empty}>
-      <p className={styles.emptyTitle}>{title}</p>
-      {subtitle ? <p className={styles.emptySub}>{subtitle}</p> : null}
-      {action}
     </div>
   )
 }

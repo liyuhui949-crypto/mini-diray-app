@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 
 import { copy } from '@shared/copy'
+import { PASSWORD_MIN_LENGTH } from '@shared/schemas'
 import { formatBytes } from '@shared/date'
 import { formatPackageKey, generatePackageKey, normalizePackageKey } from '@shared/packageKey'
 import type { MigrationSummary } from '@shared/types'
@@ -73,7 +74,7 @@ export function MigrationExportDialog({
   )
 
   const goToKey = (): void => {
-    if (password.length < 8) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       setError('私钥至少 8 位')
       return
     }
@@ -198,7 +199,6 @@ export function MigrationExportDialog({
             {keyDisplay}
           </code>
           <p className={styles.keyWarning}>{copy.migration.keyWarning}</p>
-          {phase === 'done' ? <p className={styles.hint}>{copy.migration.keyDoneHint}</p> : null}
         </div>
       ) : null}
 

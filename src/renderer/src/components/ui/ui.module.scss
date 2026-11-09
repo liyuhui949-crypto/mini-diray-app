@@ -201,33 +201,6 @@
   cursor: pointer;
 }
 
-.spinnerWrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--md-text-tertiary);
-  font-size: 12px;
-}
-
-.spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--md-border-strong);
-  border-top-color: var(--md-accent);
-  animation: spin 720ms linear infinite;
-}
-
-.spinnerLabel {
-  font-size: 12px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .progressTrack {
   height: 6px;
   border-radius: 3px;
@@ -256,37 +229,6 @@
     color: var(--md-text-tertiary);
     font-variant-numeric: tabular-nums;
   }
-}
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--md-text-tertiary);
-}
-
-.emptyCompact {
-  padding: 32px 20px;
-  text-align: center;
-  color: var(--md-text-tertiary);
-  font-size: 12.5px;
-  line-height: 1.8;
-}
-
-.emptyTitle {
-  margin: 0;
-  font-size: 15px;
-  color: var(--md-text-secondary);
-}
-
-.emptySub {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.7;
 }
 
 .overlay {

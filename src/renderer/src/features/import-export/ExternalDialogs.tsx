@@ -170,7 +170,6 @@ export function ImportDialog({
               ))}
             </ul>
           ) : null}
-          <p className={styles.warnText}>{copy.importDialog.attachmentWarning}</p>
         </div>
       ) : null}
 

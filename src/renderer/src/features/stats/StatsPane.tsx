@@ -13,6 +13,7 @@ import styles from './stats.module.scss'
 export function StatsPane(): React.JSX.Element {
   const entries = useEntriesStore((state) => state.entries)
   const [storage, setStorage] = useState<StorageStats | null>(null)
+  const [storageError, setStorageError] = useState(false)
 
   const today = todayLocalDate()
   const options = useMemo(() => ({ today }), [today])
@@ -25,9 +26,13 @@ export function StatsPane(): React.JSX.Element {
     let cancelled = false
     void call('stats:storage', undefined)
       .then((value) => {
-        if (!cancelled) setStorage(value)
+        if (cancelled) return
+        setStorage(value)
+        setStorageError(false)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!cancelled) setStorageError(true)
+      })
     return () => {
       cancelled = true
     }
@@ -137,6 +142,7 @@ export function StatsPane(): React.JSX.Element {
           />
         ) : null}
         <Row label={copy.stats.storageVault} value={formatBytes(storage?.vaultBytes ?? 0)} />
+        {storageError ? <p className={styles.errorNote}>{copy.stats.computeError}</p> : null}
       </section>
     </div>
   )

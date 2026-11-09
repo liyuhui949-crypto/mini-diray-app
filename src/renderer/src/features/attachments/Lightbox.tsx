@@ -2,7 +2,7 @@ import { copy } from '@shared/copy'
 import { formatBytes, formatDateCN } from '@shared/date'
 import type { Attachment } from '@shared/types'
 
-import { call } from '@/api/client'
+import { saveAttachmentAs } from '@/features/attachments/saveAttachmentAs'
 import { Button, Dialog } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
@@ -34,7 +34,7 @@ export function Lightbox(): React.JSX.Element {
       footer={
         attachment ? (
           <>
-            <Button onClick={() => void call('attachment:saveAs', { id: attachment.id })}>
+            <Button onClick={() => void saveAttachmentAs(attachment.id)}>
               另存为…
             </Button>
             <Button variant="primary" onClick={closeLightbox}>

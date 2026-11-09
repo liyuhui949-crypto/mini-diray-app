@@ -32,6 +32,7 @@ function abbreviateHome(target: string): string {
 }
 
 export function PreferencesPane(): React.JSX.Element {
+  const appVersion = usePrefsStore((state) => state.appVersion)
   const prefs = usePrefsStore((state) => state.prefs)
   const update = usePrefsStore((state) => state.update)
   const openDialog = useUiStore((state) => state.openDialog)
@@ -168,7 +169,10 @@ export function PreferencesPane(): React.JSX.Element {
 
       <section className={styles.panel}>
         <h3>{copy.preferences.about}</h3>
-        <AboutRow label={copy.preferences.version} value="4.0.0" />
+        <AboutRow
+          label={copy.preferences.version}
+          value={appVersion || '1.0.0'}
+        />
         <AboutRow label={copy.preferences.encryption} value={copy.preferences.encryptionValue} />
         <AboutRow label={copy.preferences.limitations} value={copy.preferences.limitationsValue} />
         <AboutRow label={copy.preferences.backup} value={copy.preferences.backupValue} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { copy } from '@shared/copy'
+import { PASSWORD_MIN_LENGTH } from '@shared/schemas'
 import { formatBytes } from '@shared/date'
 
 import { call, errorMessage } from '@/api/client'
@@ -34,7 +35,7 @@ export function ChangePasswordDialog({
 
   const submit = async (): Promise<void> => {
     setError(null)
-    if (next.length < 8) {
+    if (next.length < PASSWORD_MIN_LENGTH) {
       setError(copy.changePassword.tooShort)
       return
     }
