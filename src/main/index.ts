@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { BrowserWindow, app, nativeTheme, session } from 'electron'
+import { BrowserWindow, app, dialog, nativeTheme, session } from 'electron'
 
 import { EVENTS } from '@shared/ipc'
 
@@ -96,6 +96,16 @@ let quitting = false
 const singleInstance = app.requestSingleInstanceLock()
 
 if (!singleInstance) {
+  // 开发模式下最常见的原因是安装版还开着（两者共用同一个 userData 与 SingleInstanceLock）
+  if (DEV) {
+    console.error(
+      '已有 Mini Diary 实例在运行（可能是安装版），开发预览未启动。先退出它，再执行 pnpm dev。'
+    )
+    dialog.showErrorBox(
+      '无法启动开发预览',
+      '已经有一个 Mini Diary 实例在运行，可能是安装版或另一个开发实例。\n请先退出它，再重新执行 pnpm dev。'
+    )
+  }
   app.quit()
 } else {
   collectPackagePath(process.argv.slice(1))
