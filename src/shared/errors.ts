@@ -15,7 +15,6 @@ export type ErrorCode =
   | 'BUSY'
   | 'NOT_ENOUGH_SPACE'
   | 'UNSUPPORTED'
-  | 'UPDATE_UNAVAILABLE'
   | 'PACKAGE_KEY_REQUIRED'
   | 'PACKAGE_VERSION_UNSUPPORTED'
   | 'UNKNOWN'
@@ -35,7 +34,6 @@ const defaultMessages: Record<ErrorCode, string> = {
   BUSY: copy.errors.busy,
   NOT_ENOUGH_SPACE: copy.errors.notEnoughSpace,
   UNSUPPORTED: '不支持的操作',
-  UPDATE_UNAVAILABLE: copy.errors.updateUnavailable,
   PACKAGE_KEY_REQUIRED: copy.errors.packageKeyRequired,
   PACKAGE_VERSION_UNSUPPORTED: copy.errors.packageVersionUnsupported,
   UNKNOWN: copy.errors.unknown
@@ -67,6 +65,3 @@ export function toErrorPayload(error: unknown): ErrorPayload {
   return { code: 'UNKNOWN', message: defaultMessages.UNKNOWN }
 }
 
-export function messageForCode(code: ErrorCode): string {
-  return defaultMessages[code]
-}

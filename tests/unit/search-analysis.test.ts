@@ -141,6 +141,12 @@ describe('analyzeSearch', () => {
     expect(analysis.hits.map((hit) => hit.entry.date)).toEqual(['2026-05-01'])
   })
 
+  it('隐藏标题时用正文首行作为展示标题', () => {
+    const list = [entry('2026-05-01', '', '第一行正文\n第二行')]
+    const analysis = analyzeSearch(list, '第一行', { hideTitle: true })
+    expect(analysis!.hits[0]!.title).toBe('第一行正文')
+  })
+
   it('标签命中同样计入篇数', () => {
     const analysis = analyzeSearch(fixtures, '身体')
     expect(analysis!.hits).toHaveLength(1)

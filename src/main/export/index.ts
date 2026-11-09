@@ -4,6 +4,7 @@ import path from 'node:path'
 import { AppError } from '@shared/errors'
 import type { ExportFormat } from '@shared/types'
 import { formatDateWithWeekdayCN } from '@shared/date'
+import { escapeHtml } from '@shared/markdown'
 
 import { logger } from '../logger'
 import type { AttachmentStore } from '../attachments/store'
@@ -135,12 +136,4 @@ function buildFallbackPdfHtml(entries: readonly { date: string; title: string; b
       return `<article class="entry"><h2>${title}</h2><p class="entry-meta">${escapeHtml(formatDateWithWeekdayCN(entry.date))}</p><div class="entry-body">${body}</div></article>`
     })
     .join('\n')
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }

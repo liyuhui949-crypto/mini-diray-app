@@ -37,7 +37,6 @@ export const SIZE_LIMITS: Record<AttachmentKind, number> = {
   file: 2 * 1024 * 1024 * 1024
 }
 
-export const LARGE_FILE_CONFIRM_BYTES = 300 * 1024 * 1024
 const HEAD_SNIFF_BYTES = 4096
 
 export interface AddProgress {

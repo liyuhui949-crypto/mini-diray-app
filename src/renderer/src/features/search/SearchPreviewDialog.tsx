@@ -75,11 +75,9 @@ export function SearchPreviewDialog(): React.JSX.Element {
       }
       footer={
         <>
-          <span className={styles.pvNote}>
-            {bodyHits > 0
-              ? copy.search.previewNote(bodyHits, query)
-              : copy.search.previewNoteEmpty}
-          </span>
+          {bodyHits > 0 ? (
+            <span className={styles.pvNote}>{copy.search.previewNote(bodyHits, query)}</span>
+          ) : null}
           <Button onClick={close}>{copy.common.close}</Button>
           <Button variant="primary" onClick={openInDiary}>
             {copy.search.openInDiary}

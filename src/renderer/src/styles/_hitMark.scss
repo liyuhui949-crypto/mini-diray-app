@@ -1,0 +1,8 @@
+// 检索命中高亮：列表、证据行、预览与 CodeMirror 共用同一组样式
+@mixin hit-mark {
+  background: var(--md-accent-soft);
+  color: var(--md-text-primary);
+  border-radius: 2px;
+  padding: 0 1px;
+  box-shadow: inset 0 -1px 0 var(--md-accent);
+}

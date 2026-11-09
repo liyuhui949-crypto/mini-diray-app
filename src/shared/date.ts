@@ -2,21 +2,6 @@ import type { LocalDate } from './types'
 
 const WEEKDAY_CN = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const
 const WEEKDAY_SHORT_CN = ['日', '一', '二', '三', '四', '五', '六'] as const
-const MONTH_CN = [
-  '一月',
-  '二月',
-  '三月',
-  '四月',
-  '五月',
-  '六月',
-  '七月',
-  '八月',
-  '九月',
-  '十月',
-  '十一月',
-  '十二月'
-] as const
-
 const LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MS_PER_DAY = 86_400_000
 
@@ -66,13 +51,6 @@ export function addDays(value: LocalDate, days: number): LocalDate {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days))
 }
 
-/** 本地日期所在的周一（ISO 周） */
-export function startOfIsoWeek(value: LocalDate): LocalDate {
-  const date = parseLocalDate(value)
-  const offset = (date.getDay() + 6) % 7
-  return addDays(value, -offset)
-}
-
 /** 所在周的第一天（固定周一，日历与统计共用同一口径） */
 export function startOfWeek(value: LocalDate): LocalDate {
   const date = parseLocalDate(value)
@@ -87,14 +65,6 @@ export function daysBetween(a: LocalDate, b: LocalDate): number {
   const startUTC = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
   const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate())
   return Math.round((endUTC - startUTC) / MS_PER_DAY)
-}
-
-export function compareLocalDate(a: LocalDate, b: LocalDate): number {
-  return a < b ? -1 : a > b ? 1 : 0
-}
-
-export function isAfter(a: LocalDate, b: LocalDate): boolean {
-  return a > b
 }
 
 export function isFutureDate(value: LocalDate, today: LocalDate): boolean {
@@ -132,15 +102,6 @@ export function formatMonthDayWithWeekdayCN(value: LocalDate): string {
   return `${formatMonthDayCN(value)} · ${weekdayCN(value)}`
 }
 
-export function formatShortDateCN(value: LocalDate): string {
-  const date = parseLocalDate(value)
-  return `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}`
-}
-
-export function monthNameCN(monthIndex: number): string {
-  return MONTH_CN[monthIndex] ?? ''
-}
-
 /** 相对今天的标签：今天 / 昨天 / N 天前 / N 天后 */
 export function relativeDayLabelCN(value: LocalDate, today: LocalDate): string {
   const diff = daysBetween(today, value)
@@ -152,10 +113,6 @@ export function relativeDayLabelCN(value: LocalDate, today: LocalDate): string {
 }
 
 /** 把 `2026-11` 形式转成当月第一天 */
-export function monthStart(year: number, month: number): LocalDate {
-  return `${year}-${pad2(month)}-01`
-}
-
 export interface CalendarCell {
   date: LocalDate
   day: number

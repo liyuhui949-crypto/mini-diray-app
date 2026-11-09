@@ -112,11 +112,6 @@ export function SearchPane(): React.JSX.Element {
         <section className={styles.panel}>
           <header className={styles.panelHead}>
             <h3>{copy.search.timelineTitle}</h3>
-            <span>
-              {analysis.timeline.unit === 'month'
-                ? copy.search.timelineHintMonth
-                : copy.search.timelineHintYear}
-            </span>
           </header>
           <div className={styles.bars} data-testid="search-bars" data-dense={dense}>
             {analysis.timeline.buckets.map((bucket, index) => {
@@ -220,7 +215,7 @@ export function SearchPane(): React.JSX.Element {
                         <span key={`${date}-snip-${index}`} className={styles.snippet}>
                           {snippet.segments.map((segment, segIndex) =>
                             segment.match ? (
-                              <mark key={segIndex} className={styles.mark}>
+                              <mark key={segIndex} className="hitMark">
                                 {segment.text}
                               </mark>
                             ) : (

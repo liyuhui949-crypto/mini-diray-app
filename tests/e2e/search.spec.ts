@@ -83,11 +83,9 @@ test('检索洞察：概览、时间线、分组证据与预览不打断检索',
     await expect(page.locator('.cmHit').first()).toBeVisible()
     await expect(page.getByText(/命中 \d+ 处/)).toBeVisible()
 
-    // 7. 一开始输入，高亮与计数一起消失
-    await page.locator('.cm-content').click()
-    await page.keyboard.type('继续写')
-    await expect(page.locator('.cmHit')).toHaveCount(0)
-    await expect(page.getByText(/命中 \d+ 处/)).toHaveCount(0)
+    // 7. 历史日记是只读的：跳过来仍然只有只读态，正文不可编辑
+    await expect(page.getByText('历史日记 · 只读')).toBeVisible()
+    await expect(page.locator('.cm-content')).toHaveAttribute('aria-readonly', 'true')
 
     expect(errors).toEqual([])
   } finally {

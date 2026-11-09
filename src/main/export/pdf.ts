@@ -5,6 +5,7 @@ import { BrowserWindow, app, protocol, session } from 'electron'
 import sanitizeHtml from 'sanitize-html'
 
 import { AppError } from '@shared/errors'
+import { escapeHtml } from '@shared/markdown'
 
 import { logger } from '../logger'
 import { randomUuid } from '../vault/crypto'
@@ -149,14 +150,6 @@ ${safeBody}
 <footer class="page-footer">由 Mini Diary 生成 · 内容来自本机加密日记库</footer>
 </body>
 </html>`
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 /**

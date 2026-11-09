@@ -1,5 +1,5 @@
 import type { DiaryEntry, LocalDate } from './types'
-import { addDays, daysBetween, parseLocalDate, startOfWeek, toLocalDate } from './date'
+import { addDays, daysBetween, parseLocalDate, startOfWeek } from './date'
 import { countEntryWords } from './words'
 
 export interface DiaryStats {
@@ -215,6 +215,3 @@ export function statsRangeLabel(stats: DiaryStats): { first: string; last: strin
 }
 
 /** 今天的本地日期（测试可注入） */
-export function nowLocalDate(now: Date = new Date()): LocalDate {
-  return toLocalDate(now)
-}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { countEntryWords, countWords, deriveTitle, makeSnippet, plainText } from '@shared/words'
-import { collectTags, filterByTag, highlightSegments, searchEntries } from '@shared/search'
+import { collectTags, filterByTag, highlightSegments } from '@shared/search'
 import { calcStats, hasContent, heatmapColumns, weeklyBuckets } from '@shared/stats'
 import {
   collectBrokenAttachmentRefs,
@@ -84,29 +84,6 @@ describe('搜索', () => {
     entry({ date: '2026-11-05', title: '关于专注', body: '深度工作需要专注。', tags: ['思考'] }),
     entry({ date: '2026-11-04', title: '降温', body: '出门忘了带外套。', tags: ['日常'] })
   ]
-
-  it('标题、正文、标签都能命中，大小写不敏感', () => {
-    expect(searchEntries(entries, '雨停').map((hit) => hit.entry.date)).toEqual(['2026-11-06'])
-    expect(searchEntries(entries, '外套')[0]?.entry.date).toBe('2026-11-04')
-    expect(searchEntries(entries, '思考')[0]?.entry.date).toBe('2026-11-05')
-    expect(searchEntries(entries, 'HELLO')).toHaveLength(0)
-  })
-
-  it('多个词是“与”关系，标题命中排序更靠前', () => {
-    const hits = searchEntries(entries, '专注 深度')
-    expect(hits).toHaveLength(1)
-    expect(hits[0]?.entry.date).toBe('2026-11-05')
-    const byTitle = searchEntries(entries, '专注')
-    expect(byTitle[0]?.entry.date).toBe('2026-11-05')
-  })
-
-  it('空查询返回空数组，隐藏标题时用正文首行', () => {
-    expect(searchEntries(entries, '   ')).toHaveLength(0)
-    const hit = searchEntries([entry({ date: '2026-11-06', body: '第一行正文' })], '第一行', {
-      hideTitle: true
-    })[0]
-    expect(hit?.title).toBe('第一行正文')
-  })
 
   it('高亮片段把命中处切开', () => {
     expect(highlightSegments('雨停之后雨停了', '雨')).toEqual([

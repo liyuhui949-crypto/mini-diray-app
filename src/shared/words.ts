@@ -6,20 +6,9 @@
 const CJK_RE = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3040-\u30FF]/g
 const LATIN_WORD_RE = /[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g
 
-/** 去掉 Markdown 标记与 URL，只留下"人读的字" */
-export function plainText(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```[a-z]*\n?/g, ''))
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // 图片（含附件图片）不计入字数
-    .replace(/\[([^\]]*)\]\((?:attachment|https?):[^)]*\)/g, '$1') // 链接只保留文字
-    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')
-    .replace(/^[ \t]{0,3}>[ \t]?/gm, '')
-    .replace(/^[ \t]{0,3}[-*+][ \t]+/gm, '')
-    .replace(/^[ \t]{0,3}\d+\.[ \t]+/gm, '')
-    .replace(/[*_~`|]/g, '')
-    .replace(/^[ \t]*-{3,}[ \t]*$/gm, '')
-    .replace(/<[^>]+>/g, '')
-}
+import { plainText, previewSnippet } from './text'
+
+export { plainText }
 
 export function countWords(text: string): number {
   if (!text) return 0
@@ -37,9 +26,7 @@ export function countEntryWords(title: string, body: string): number {
 
 /** 列表摘要：去掉附件与标题后的前 N 个字 */
 export function makeSnippet(body: string, title: string, limit = 90): string {
-  const plain = plainText(body).replace(/\s+/g, ' ').trim()
-  if (plain) return plain.slice(0, limit)
-  return title.slice(0, limit)
+  return previewSnippet(body, limit) || title.slice(0, limit)
 }
 
 /** 隐藏标题时，用正文首行代替标题 */
