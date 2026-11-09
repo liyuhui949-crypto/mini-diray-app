@@ -1768,7 +1768,28 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - 批注栏头部去掉「＋」图标，改为一行提示文本「选中正文即可加批注」；整篇批注仍走空日期里的 CTA；
 - 现在只有条目列表支持拖拽改宽（240–420px，`listWidth` 持久化）。
 
-### 15.23 已修复问题
+### 15.23 附件库（ATTACHMENT-LIB-PRD v1.0）
+
+- **零新存储**：新增 `shared/attachmentIndex.ts`（`buildAttachmentIndex` / 计数 / 总体积），从已加载的 `entries` 纯派生；无新 IPC、无索引文件；
+- **视图**：侧栏新增「附件」入口（与统计/设置同级），五类 tab + 实时计数 + 总体积；可预览类图片墙（`loading=lazy`、`decoding=async`、`content-visibility:auto`），文件类行列表 +「不可预览」；
+- **预览联动**：复用检索预览对话框，新增 `from: 'search' | 'library'`；附件库脚注「来自附件库 · 这篇共 n 个附件 · 关闭即回」，「在日记中打开」走普通跳转、不触发检索高亮；
+- **状态**：tab 与滚动位置在预览打开/关闭期间保留，跳转后重建为默认态；
+- 单测 3 条（聚合/排序/计数），e2e 2 条（主流程 + 空态）；`pnpm verify` 与全量 e2e 全绿。
+
+### 15.24 附件库：预览模式与未引用附件
+
+- **预览模式**：新增持久化偏好 `attachmentPreviewMode`（`attachment` / `entry`，默认 `entry` 保持原行为）；
+  附件库右上角按钮组切换；点击可预览附件时按模式进入灯箱或日记预览；
+  预览内可互相切换（灯箱「查看所属日记」/ 日记预览「预览附件」），**切换不落盘**，每次新预览仍以外部选择为准；
+- **未引用附件**：新增 `attachments/orphans.ts`（`scanOrphans`）与 IPC `attachment:orphans`；
+  `attachment:cleanup` 改为复用同一扫描（保留 dryRun/ids 语义）；
+  附件库新增「未引用」tab（计数、类型/大小、清理按钮），清理对话框复用原 `CleanupDialog`；
+- **设置页移除**「清理未引用附件」入口与对应文案键，`DialogName` 去掉 `cleanup`；
+- **未引用附件可预览**：`attachment://` 代理在查不到 entry 元数据时回退到 `.mdat` 头部（`describe`）并嗅探明文头部得到 mime，
+  按 id 缓存、锁定时清空；附件库中图片/视频/音频类的孤儿行可直接进灯箱（文件类仍标注不可预览）；
+- 测试：新增 `scanOrphans` 单测 1 条、e2e 2 条（模式切换/持久化与预览内互切、未引用查看/预览/清理并确认设置无入口）。
+
+### 15.25 已修复问题
 
 | 问题 | 原因 | 处理 |
 |---|---|---|
