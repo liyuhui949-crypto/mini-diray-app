@@ -1794,7 +1794,7 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 - `scripts/package-dir.mjs` 支持 `--arch=arm64|x64|universal`，默认当前机器架构；本机已有 Electron 发行版时通过 `electronDist` 直接复用，不再联网下载；
 - 新增 `package:mac:x64` / `package:mac:universal`；`package:mac` 产出 arm64 dmg + zip；
 - 无证书时用 `CSC_IDENTITY_AUTO_DISCOVERY=false` 出未签名包（Gatekeeper 需右键打开或 `xattr`）；正式分发走 Developer ID + 公证（环境变量 `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`），不上架 App Store；
-- 文档：[docs/packaging.md](packaging.md)；
+- 文档：[docs/packaging.md](packaging.md)，含 Windows 安装包完整流程（命令、产物、自检、签名、GitHub Actions、常见问题）；
 - 无证书时 `scripts/after-pack.cjs` 自动做 ad-hoc 签名，修复「已损坏，无法打开」；
 - **体积**：`@fontsource` 整套字体不再进 asar，只把 PDF 用的 4 个 `.woff2` 放进 `Resources/fonts`；
   asar 76 MB → 4.6 MB，dmg 185 MB → 117 MB，App 344 MB → 264 MB（其余是 Electron 运行时）；
