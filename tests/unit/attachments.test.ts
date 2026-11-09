@@ -4,7 +4,9 @@ import path from 'node:path'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { scanOrphans } from '../../src/main/attachments/orphans'
 import { AttachmentStore, SIZE_LIMITS } from '../../src/main/attachments/store'
+import { VaultRepository } from '../../src/main/vault/repository'
 import {
   DEFAULT_CHUNK_SIZE,
   MDAT_HEADER_SIZE,
@@ -267,5 +269,47 @@ describe('AttachmentStore 流式读写', () => {
         void chunk
       }
     }).rejects.toThrow()
+  })
+})
+
+describe('未引用附件扫描', () => {
+  it('只返回没有被任何 entry 引用的附件，并从头部嗅探 kind', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'minidiary-orphans-'))
+    try {
+      const repo = new VaultRepository({ dir, scrypt: { N: 1024, r: 8, p: 1 } })
+      await repo.create('orphan-password-1234')
+      const store = new AttachmentStore(dir, () => repo.getAttachmentKey())
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4EWADRAwQCgAnbgVRZO/EWgAAAABJRU5ErkJggg==',
+        'base64'
+      )
+
+      const referenced = await store.addFromBytes({
+        name: '书桌.png',
+        mime: 'image/png',
+        bytes: new Uint8Array(png)
+      })
+      await repo.saveEntry({
+        date: '2026-11-05',
+        title: '被引用',
+        body: `![书桌](attachment://${referenced.id})`,
+        tags: [],
+        attachments: [referenced]
+      })
+      const orphan = await store.addFromBytes({
+        name: '旧照片.png',
+        mime: 'image/png',
+        bytes: new Uint8Array(png)
+      })
+
+      const result = await scanOrphans(repo, store)
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]?.id).toBe(orphan.id)
+      expect(result.items[0]?.kind).toBe('image')
+      expect(result.items[0]?.size).toBe(png.length)
+      expect(result.bytes).toBe(png.length)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

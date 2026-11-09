@@ -79,7 +79,7 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
 
   await page.locator('.cm-content').click()
   await page.keyboard.press('Meta+End')
-  await page.getByRole('button', { name: '附件' }).click()
+  await page.getByRole('article').getByRole('button', { name: '附件' }).click()
 
   // 等附件真正写进库（自动保存是 800ms 防抖，不能只看“已保存”文案）
   await expect
