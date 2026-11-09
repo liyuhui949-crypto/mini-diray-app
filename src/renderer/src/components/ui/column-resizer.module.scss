@@ -1,0 +1,37 @@
+// 列宽拖拽手柄：只有 6px 命中区，视觉上是一条随 hover 出现的细线
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background var(--md-dur) var(--md-ease);
+  }
+
+  &:hover::after,
+  &[data-active='true']::after,
+  &:focus-visible::after {
+    background: var(--md-accent);
+    box-shadow: 0 0 0 1px var(--md-accent);
+  }
+
+  &[data-side='right'] {
+    right: 0;
+  }
+
+  &[data-side='left'] {
+    left: 0;
+  }
+}

@@ -66,6 +66,7 @@ function renderCalendar(overrides: Partial<React.ComponentProps<typeof CalendarP
     today: '2026-11-06',
     selected: '2026-11-06',
     entries,
+    annotations: {},
     allowFutureEntries: false,
     onCursorChange: vi.fn(),
     onSelect: vi.fn(),
@@ -240,7 +241,7 @@ describe('条目列表范围', () => {
   })
 
   it('默认只显示日历当前月份的条目', () => {
-    render(<EntryList collapsed={false} />)
+    render(<EntryList />)
     expect(screen.getByText('2026年10月')).toBeInTheDocument()
     expect(screen.getByText('十月的日记')).toBeInTheDocument()
     expect(screen.queryByText('十一月的日记')).toBeNull()
@@ -249,7 +250,7 @@ describe('条目列表范围', () => {
 
   it('切到“全部”后显示所有月份', async () => {
     const user = userEvent.setup()
-    render(<EntryList collapsed={false} />)
+    render(<EntryList />)
     await user.click(screen.getByRole('button', { name: '全部' }))
     expect(screen.getByText('全部条目')).toBeInTheDocument()
     expect(screen.getByText('十月的日记')).toBeInTheDocument()
@@ -258,7 +259,7 @@ describe('条目列表范围', () => {
 
   it('搜索跨月份，且不再受列表范围限制', () => {
     useEntriesStore.setState({ searchQuery: '十一月' })
-    render(<EntryList collapsed={false} />)
+    render(<EntryList />)
     expect(screen.getByText('搜索结果')).toBeInTheDocument()
     expect(screen.getByText('1 个结果')).toBeInTheDocument()
     // 命中处被 <mark> 切开，这里用日期行判断是哪一篇
@@ -294,7 +295,7 @@ describe('条目列表范围', () => {
 
   it('标签筛选也是全库视图', () => {
     useEntriesStore.setState({ activeTag: '工作' })
-    render(<EntryList collapsed={false} />)
+    render(<EntryList />)
     expect(screen.getByText('标签 #工作')).toBeInTheDocument()
     expect(screen.getByText('十一月的日记')).toBeInTheDocument()
   })

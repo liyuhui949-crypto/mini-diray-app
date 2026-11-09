@@ -36,6 +36,8 @@ export default function App(): React.JSX.Element {
         const info = await call('app:bootstrap', undefined)
         if (cancelled) return
         usePrefsStore.getState().setPrefs(info.prefs)
+        usePrefsStore.getState().setAppVersion(info.version)
+        useUiStore.getState().hydrateLayout(info.prefs)
         useVaultStore.getState().setStatus(info.vaultStatus)
         if (info.vaultStatus === 'unlocked') {
           const snapshot = await call('vault:snapshot', undefined)
@@ -131,21 +133,8 @@ export default function App(): React.JSX.Element {
           case 'insert-attachment':
             ui.requestAttachment()
             break
-          case 'lock':
-            break
           default:
             break
-        }
-      }),
-      subscribe('update:status', (update) => {
-        if (update.state === 'available') {
-          pushToast(`发现新版本 ${update.version ?? ''}`, { tone: 'default' })
-        }
-        if (update.state === 'downloaded') {
-          pushToast('更新已下载，退出后安装', { tone: 'default' })
-        }
-        if (update.state === 'error') {
-          pushToast(update.message ?? copy.errors.updateUnavailable, { tone: 'error' })
         }
       }),
       subscribe('migration:open-package', ({ path }) => {

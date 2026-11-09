@@ -28,7 +28,10 @@ export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
     diaryDir,
     lastOpenedDate: null,
     lastImportDir: null,
-    lastExportDir: null
+    lastExportDir: null,
+    sidebarCollapsed: false,
+    listWidth: 312,
+    annotationCollapsed: false
   }
 }
 

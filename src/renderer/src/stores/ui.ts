@@ -1,5 +1,5 @@
 import { todayLocalDate } from '@shared/date'
-import type { LocalDate } from '@shared/types'
+import type { LocalDate, Preferences } from '@shared/types'
 import { create } from 'zustand'
 
 export type ViewName = 'editor' | 'stats' | 'settings' | 'search'
@@ -42,7 +42,9 @@ interface UiState {
   view: ViewName
   dialog: DialogName
   sidebarCollapsed: boolean
-  listCollapsed: boolean
+  /** 条目列表宽度（px） */
+  listWidth: number
+  annotationCollapsed: boolean
   lightboxId: string | null
   toasts: ToastItem[]
   /** 编辑器预览模式：跨日记保留，切日期不重置 */
@@ -60,14 +62,16 @@ interface UiState {
   openSearchPreview: (date: LocalDate) => void
   closeSearchPreview: () => void
   requestSearchJump: (date: LocalDate, query: string) => void
-  clearSearchJump: () => void
   setPreviewMode: (preview: boolean) => void
   setCalendarMonth: (month: LocalDate) => void
   setListScope: (scope: ListScope) => void
   openDialog: (dialog: Exclude<DialogName, null>) => void
   closeDialog: () => void
   toggleSidebar: () => void
-  toggleList: () => void
+  setListWidth: (width: number) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+  setAnnotationCollapsed: (collapsed: boolean) => void
+  hydrateLayout: (prefs: Preferences) => void
   openLightbox: (id: string) => void
   closeLightbox: () => void
   pushToast: (message: string, options?: { action?: ToastAction; tone?: ToastItem['tone'] }) => void
@@ -81,7 +85,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   view: 'editor',
   dialog: null,
   sidebarCollapsed: false,
-  listCollapsed: false,
+  listWidth: 312,
+  annotationCollapsed: false,
   lightboxId: null,
   toasts: [],
   previewMode: false,
@@ -99,7 +104,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((state) => ({
       searchJump: { date, query, seq: (state.searchJump?.seq ?? 0) + 1 }
     })),
-  clearSearchJump: () => set({ searchJump: null }),
   setPreviewMode: (previewMode) => set({ previewMode }),
   setCalendarMonth: (calendarMonth) => set({ calendarMonth }),
   setListScope: (listScope) => set({ listScope }),
@@ -109,7 +113,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   openDialog: (dialog) => set({ dialog }),
   closeDialog: () => set({ dialog: null }),
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
-  toggleList: () => set({ listCollapsed: !get().listCollapsed }),
+  setListWidth: (listWidth) => set({ listWidth }),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  setAnnotationCollapsed: (annotationCollapsed) => set({ annotationCollapsed }),
+  hydrateLayout: (prefs) =>
+    set({
+      listWidth: prefs.listWidth ?? 312,
+      sidebarCollapsed: prefs.sidebarCollapsed ?? false,
+      annotationCollapsed: prefs.annotationCollapsed ?? false
+    }),
   openLightbox: (id) => set({ lightboxId: id }),
   closeLightbox: () => set({ lightboxId: null }),
   pushToast: (message, options = {}) => {

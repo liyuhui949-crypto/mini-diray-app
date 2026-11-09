@@ -6,7 +6,7 @@ import {
   ChevronRight,
   Loader2,
   Lock,
-  Plus,
+  PanelLeft,
   Search,
   Settings
 } from 'lucide-react'
@@ -26,7 +26,7 @@ import { PreferencesPane } from '@/features/preferences/PreferencesPane'
 import { SearchPane } from '@/features/search/SearchPane'
 import { StatsPane } from '@/features/stats/StatsPane'
 import { useEntriesStore } from '@/stores/entries'
-import { usePrefsStore } from '@/stores/prefs'
+import { persistLayout, usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 
 import styles from './shell.module.scss'
@@ -41,16 +41,29 @@ export function Shell(): React.JSX.Element {
   const view = useUiStore((state) => state.view)
   const searchQuery = useEntriesStore((state) => state.searchQuery)
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed)
-  const listCollapsed = useUiStore((state) => state.listCollapsed)
-  const openDate = useEntriesStore((state) => state.openDate)
+  const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed)
   const today = todayLocalDate()
 
-  const sidebarWidth = sidebarCollapsed ? 0 : 236
-  const listWidth = listCollapsed ? 0 : 312
+  const sidebarColumns = sidebarCollapsed ? 0 : 236
+  const listWidth = useUiStore((state) => state.listWidth)
 
   return (
     <div className={styles.app}>
       <header className={styles.titlebar} data-platform={platform}>
+        <button
+          type="button"
+          className={styles.sidebarToggle}
+          aria-label={sidebarCollapsed ? copy.sidebar.expand : copy.menu.toggleSidebar}
+          aria-pressed={sidebarCollapsed}
+          title={sidebarCollapsed ? copy.sidebar.expand : copy.menu.toggleSidebar}
+          onClick={() => {
+            const next = !sidebarCollapsed
+            setSidebarCollapsed(next)
+            persistLayout({ sidebarCollapsed: next })
+          }}
+        >
+          <PanelLeft size={15} />
+        </button>
         <div className={styles.brand}>
           <span className={styles.brandMark}>M</span>
           <span className={styles.brandName}>
@@ -65,10 +78,10 @@ export function Shell(): React.JSX.Element {
 
       <div
         className={styles.grid}
-        style={{ gridTemplateColumns: `${sidebarWidth}px ${listWidth}px minmax(0, 1fr)` }}
+        style={{ gridTemplateColumns: `${sidebarColumns}px ${listWidth}px minmax(0, 1fr)` }}
       >
         <Sidebar collapsed={sidebarCollapsed} today={today} />
-        <EntryList collapsed={listCollapsed} />
+        <EntryList />
         <main className={styles.main}>
           {view === 'search' && searchQuery.trim() ? <SearchPane /> : null}
           {view === 'editor' || (view === 'search' && !searchQuery.trim()) ? <EditorPane /> : null}
@@ -77,17 +90,6 @@ export function Shell(): React.JSX.Element {
         </main>
       </div>
 
-      <button
-        type="button"
-        className={styles.quickNew}
-        onClick={() => {
-          useUiStore.getState().setView('editor')
-          void openDate(today)
-        }}
-        aria-label={copy.list.newEntry}
-      >
-        <Plus size={16} />
-      </button>
     </div>
   )
 }
@@ -129,6 +131,7 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
   const focusSearchSeq = useUiStore((state) => state.focusSearchSeq)
   const prefs = usePrefsStore((state) => state.prefs)
   const entries = useEntriesStore((state) => state.entries)
+  const annotations = useEntriesStore((state) => state.annotations)
   const searchInput = useEntriesStore((state) => state.searchInput)
   const searchQuery = useEntriesStore((state) => state.searchQuery)
   const setSearchInput = useEntriesStore((state) => state.setSearchInput)
@@ -237,6 +240,7 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
             today={today}
             selected={activeDate}
             entries={entries}
+            annotations={annotations}
             allowFutureEntries={prefs?.allowFutureEntries ?? false}
             onCursorChange={setCalendarMonth}
             onSelect={(date) => {
