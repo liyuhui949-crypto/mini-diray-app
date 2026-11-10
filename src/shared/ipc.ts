@@ -171,6 +171,7 @@ export interface IpcContract {
   'sync:push': { req: void; res: { commits: number; changed: number } }
   'sync:pull': { req: void; res: { entries: number; annotations: number } }
   'sync:missingAttachments': { req: void; res: SyncMissingAttachment[] }
+  'sync:openFolder': { req: void; res: void }
 
   'attachment:exportPackage': {
     req: { packageKey: string; packagePassword: string }

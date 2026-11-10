@@ -74,6 +74,8 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(syncSwitch).toHaveAttribute('aria-checked', 'false')
   await expect(page.getByText('同步已关闭').first()).toBeVisible()
   await expect(page.getByText('Git 密钥')).toHaveCount(0)
+  await expect(page.getByText('同步文件夹')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '打开文件夹' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '测试连接' })).toHaveCount(0)
 
   await syncSwitch.click()

@@ -37,7 +37,7 @@ import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
 import { exportAttachmentPackage, importAttachmentPackage } from '../sync/attachmentPackage'
 import { syncRoot } from '../sync/mirror'
-import { ensureVaultDirs, removePath, vaultPaths } from '../vault/paths'
+import { ensureVaultDirs, pathExists, removePath, vaultPaths } from '../vault/paths'
 import { isTrustedWebContents, setMainWindowLocked, setMainWindowOnboarding } from '../window'
 
 function resolveTheme(context: AppContext): ThemeSource {
@@ -497,6 +497,15 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   register('sync:missingAttachments', async () => context.sync.missingAttachments())
+
+  register('sync:openFolder', async () => {
+    const dir = syncRoot(context.diaryDir)
+    if (!(await pathExists(dir))) {
+      throw new AppError('NOT_FOUND', '同步文件夹尚未生成，请先开启同步并推送一次')
+    }
+    const error = await shell.openPath(dir)
+    if (error) throw new AppError('IO_ERROR', '无法打开同步文件夹')
+  })
 
   register('attachment:exportPackage', async (payload, event) => {
     const result = await exportAttachmentPackage(

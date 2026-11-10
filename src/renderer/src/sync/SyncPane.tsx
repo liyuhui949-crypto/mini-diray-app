@@ -199,11 +199,14 @@ export function SyncPane(): React.JSX.Element {
     )
   }
 
-  const openDir = (): void => {
-    void call('app:openDiaryDir', undefined).catch((error) => {
+  const openFolder = (task: () => Promise<void>): void => {
+    void task().catch((error) => {
       pushToast(errorMessage(error), { tone: 'error' })
     })
   }
+
+  const openDir = (): void => openFolder(() => call('app:openDiaryDir', undefined))
+  const openSyncFolder = (): void => openFolder(() => call('sync:openFolder', undefined))
 
   const changeDir = (): void => {
     void run('save', async () => {
@@ -423,6 +426,16 @@ export function SyncPane(): React.JSX.Element {
                 {loading === 'test' ? copy.sync.testLoading : copy.sync.test}
               </Button>
             </div>
+          </div>
+
+          <div className={styles.card}>
+            <div>
+              <div className={styles.label}>{copy.sync.syncFolder}</div>
+              <div className={styles.hint}>{copy.sync.syncFolderHint}</div>
+            </div>
+            <Button size="sm" onClick={openSyncFolder}>
+              {copy.sync.openSyncFolder}
+            </Button>
           </div>
             </>
           ) : null}
