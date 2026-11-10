@@ -1,6 +1,6 @@
 # Mini Diary 4.0
 
-本地优先、默认加密、离线可用的桌面日记。纯本地存储，没有账号，不上传任何数据。
+本地优先、默认加密、离线可用的桌面日记。默认纯本地存储，没有账号；可选 Git 同步只推送正文与批注的密文，附件仍走手动迁移。
 
 - **技术栈**：Electron + React 19 + Vite + TypeScript + SCSS
 - **界面语言**：仅简体中文（文案集中在 `src/shared/copy.ts`，不引入 i18n）
@@ -21,6 +21,7 @@
 | 统计 | 总条目、每周平均、最长/当前连续、总字数、每篇平均 + 近 12 周柱状图 + 13 周热力图 + 存储占用 |
 | 安全 | 密码解锁、锁屏/挂起立即锁定、可选空闲自动锁定、改密只重包 DEK |
 | 迁移 | `.minidiary` 整库迁移包（公钥 + 私钥双因子、ZIP64、replace/merge、staging + 原子切换 + 回滚） |
+| Git 同步 | 可选、使用系统 `git`：只同步正文与批注，今天不同步；仓库里只有密文；附件用 `.inkatt` 手动迁移；今日/附件缺失态在三处联动；令牌存系统钥匙串 |
 | 导入导出 | Day One JSON/TXT、jrnl JSON、Mini Diary JSON；导出 JSON / Markdown / PDF / Day One TXT |
 
 ## 快速开始
@@ -69,6 +70,8 @@ docs/
 ├─ implementation-pipeline-v2.md   执行入口与阶段状态
 ├─ adr/                            架构决策记录
 ├─ known-issues.md                 代码审计：已知 bug 与清理清单（待统一修复）
+├─ storage-format.md               存储格式与加密细节（vault/批注/附件/迁移包）
+├─ sync.md                         Git 同步（系统 git、仅正文/批注、附件包）
 ├─ usage.md                        使用说明（含迁移与隐私）
 └─ packaging.md                    打包与分发（macOS，不上架 App Store）
 ```
@@ -81,6 +84,7 @@ docs/
 - 渲染进程拿不到原始文件路径、文件句柄或 Node 能力；IPC 全部校验 sender + Zod。
 - 迁移包导入防 Zip Slip / Zip Bomb / 符号链接 / 重复条目，staging 校验通过后才原子切换。
 - 日志不含密码、密钥、正文、附件名。
+- Git 同步只走系统 `git`：只推送正文/批注密文，今天与附件不进入仓库；令牌存系统钥匙串，代理只影响同步子进程。
 
 ## 已知限制
 
@@ -91,4 +95,5 @@ docs/
 - macOS App Store 分发不在范围内。
 
 更多实现细节见 [执行流水线](docs/implementation-pipeline-v2.md) 与 [ADR](docs/adr/0001-rewrite.md)；
+存储与加密细节见 [存储格式与加密](docs/storage-format.md)；Git 同步见 [Git 同步](docs/sync.md)；
 已知待修问题见 [已知问题清单](docs/known-issues.md)；打包步骤见 [打包与分发](docs/packaging.md)。
