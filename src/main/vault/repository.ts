@@ -24,9 +24,10 @@ import {
   digestOfFile,
   loadAllAnnotations,
   removeAllAnnotations,
+  writeAnnotationFile,
   type NewAnnotationInput
 } from './annotations'
-import { deriveAttachmentKey, wipe, type ScryptParams } from './crypto'
+import { deriveAttachmentKey, deriveSubkey, wipe, type ScryptParams } from './crypto'
 import {
   MIGRATION_VAULT_MEMBER,
   SUPPORTED_SCHEMA_VERSION,
@@ -72,6 +73,10 @@ export interface MergeResult {
   merged: number
 }
 
+function annotationSignature(record: Annotation): string {
+  return [record.date, record.createdAt, record.quote, record.tag, record.body].join('\u0000')
+}
+
 function isEmptyDraft(draft: EntryDraft): boolean {
   return (
     draft.title.trim().length === 0 &&
@@ -94,6 +99,7 @@ export class VaultRepository {
   private envelope: VaultEnvelope | null = null
   private dek: Buffer | null = null
   private attachmentKey: Buffer | null = null
+  private syncKeyCache: Buffer | null = null
   private annotations: Record<string, Annotation[]> | null = null
   private annotationKeyCache: Buffer | null = null
   private data: VaultData | null = null
@@ -150,6 +156,15 @@ export class VaultRepository {
     return this.attachmentKey
   }
 
+  /** Git 同步镜像的条目密钥；永不跨 IPC */
+  getSyncKey(): Buffer {
+    if (!this.dek) throw new AppError('VAULT_LOCKED')
+    if (!this.syncKeyCache) {
+      this.syncKeyCache = deriveSubkey(this.dek, this.envelope?.vaultId ?? '', 'sync-v1')
+    }
+    return this.syncKeyCache
+  }
+
   /** 迁移导入重加密批注时使用的密钥；永不跨 IPC */
   getAnnotationKey(): Buffer {
     if (!this.annotationKeyCache) throw new AppError('VAULT_LOCKED')
@@ -177,6 +192,118 @@ export class VaultRepository {
       entries: this.data.entries.map((entry) => structuredClone(entry)),
       annotations: structuredClone(this.annotations ?? {})
     }
+  }
+
+  /** 同步镜像：只取“今天以前”的条目；今天永远不进入 Git */
+  getSyncEntries(today: LocalDate): DiaryEntry[] {
+    const data = this.requireData()
+    return data.entries
+      .filter((entry) => entry.date < today)
+      .map((entry) => structuredClone(entry))
+      .sort((a, b) => (a.date < b.date ? -1 : 1))
+  }
+
+  /** 同步镜像：只取“今天以前”的批注 */
+  getSyncAnnotations(today: LocalDate): Record<string, Annotation[]> {
+    const result: Record<string, Annotation[]> = {}
+    for (const [date, list] of Object.entries(this.annotations ?? {})) {
+      if (date >= today) continue
+      if (list.length > 0) result[date] = structuredClone(list)
+    }
+    return result
+  }
+
+  /**
+   * 把远端镜像合并进本地：
+   * - 条目：只接受今天以前；同一日期取 updatedAt 较新的一方（拉取前会检查本地镜像是否干净）
+   * - 批注：按内容去重；远端 id 与本地冲突时重排 id
+   * - 今天的数据永远不动
+   */
+  async applySync(
+    input: { entries: readonly DiaryEntry[]; annotations: Record<string, Annotation[]> },
+    today: LocalDate
+  ): Promise<{ entries: number; annotations: number }> {
+    this.assertUnlocked()
+    const data = this.requireData()
+    const annotationKey = this.annotationKeyCache
+    if (!annotationKey) throw new AppError('VAULT_LOCKED')
+    const now = this.clock().toISOString()
+
+    let entriesChanged = 0
+    const byDate = new Map(data.entries.map((entry) => [entry.date, entry]))
+    for (const incoming of input.entries) {
+      if (!incoming.date || incoming.date >= today) continue
+      const current = byDate.get(incoming.date)
+      if (!current) {
+        byDate.set(incoming.date, structuredClone(incoming))
+        entriesChanged += 1
+        continue
+      }
+      if (JSON.stringify(current) === JSON.stringify(incoming)) continue
+      if (incoming.updatedAt >= current.updatedAt) {
+        byDate.set(incoming.date, structuredClone(incoming))
+        entriesChanged += 1
+      }
+    }
+    if (entriesChanged > 0) {
+      data.entries = [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+    }
+
+    const localAnnotations = this.annotations ?? {}
+    const dates = new Set([
+      ...Object.keys(localAnnotations).filter((date) => date < today),
+      ...Object.keys(input.annotations).filter((date) => date < today)
+    ])
+    const mergedAnnotations: Record<string, Annotation[]> = { ...localAnnotations }
+    let annotationCount = 0
+    let annotationSeq = data.annotationSeq ?? this.maxAnnotationSeq()
+
+    for (const date of dates) {
+      const local = localAnnotations[date] ?? []
+      const incoming = input.annotations[date] ?? []
+      if (incoming.length === 0) continue
+
+      const signatures = new Set(local.map(annotationSignature))
+      const next = [...local]
+      let changed = false
+      for (const record of incoming) {
+        if (signatures.has(annotationSignature(record))) continue
+        signatures.add(annotationSignature(record))
+        let id = record.id
+        if (next.some((item) => item.id === id)) {
+          annotationSeq += 1
+          id = `n${annotationSeq}`
+        } else {
+          annotationSeq = Math.max(annotationSeq, Number(id.slice(1)) || 0)
+        }
+        next.push({ ...record, id })
+        changed = true
+        annotationCount += 1
+      }
+      if (!changed) continue
+      next.sort((a, b) => a.createdAt - b.createdAt)
+      mergedAnnotations[date] = next
+    }
+
+    if (annotationCount > 0) {
+      const digests = { ...(data.annotationDigests ?? {}) }
+      for (const date of dates) {
+        const local = localAnnotations[date] ?? []
+        const next = mergedAnnotations[date] ?? []
+        if (JSON.stringify(local) === JSON.stringify(next)) continue
+        digests[date] = await writeAnnotationFile(this.dir, date, next, annotationKey)
+      }
+      data.annotationDigests = digests
+      data.annotationSeq = annotationSeq
+      this.annotations = mergedAnnotations
+    }
+
+    if (entriesChanged > 0 || annotationCount > 0) {
+      data.updatedAt = now
+      await this.persist(data)
+      this.revision += 1
+    }
+    return { entries: entriesChanged, annotations: annotationCount }
   }
 
   /** 载入（或重新载入）全部批注；发现哈希不符只记录，不阻断解锁 */
@@ -274,6 +401,7 @@ export class VaultRepository {
     this.envelope = envelope
     this.dek = dek
     this.attachmentKey = deriveAttachmentKey(dek, data.vaultId)
+    this.syncKeyCache = null
     this.annotationKeyCache = annotationKey(dek, data.vaultId)
     this.data = data
     this.annotations = {}
@@ -297,6 +425,7 @@ export class VaultRepository {
     this.envelope = envelope
     this.dek = opened.dek
     this.attachmentKey = deriveAttachmentKey(opened.dek, envelope.vaultId)
+    this.syncKeyCache = null
     this.annotationKeyCache = annotationKey(opened.dek, envelope.vaultId)
     this.data = opened.data
     this.revision += 1
@@ -309,9 +438,11 @@ export class VaultRepository {
   lock(): void {
     wipe(this.dek)
     wipe(this.attachmentKey)
+    wipe(this.syncKeyCache)
     wipe(this.annotationKeyCache)
     this.dek = null
     this.attachmentKey = null
+    this.syncKeyCache = null
     this.annotationKeyCache = null
     this.annotations = null
     this.envelope = null

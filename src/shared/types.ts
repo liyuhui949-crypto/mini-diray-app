@@ -104,6 +104,18 @@ export interface Preferences {
   annotationCollapsed?: boolean
   /** 附件库点击可预览附件时的默认行为：直接看附件，还是看所属日记 */
   attachmentPreviewMode?: 'attachment' | 'entry'
+  /** Git 同步仓库地址（HTTPS）；null = 未配置 */
+  syncRepo?: string | null
+  /** Git 分支，默认 main */
+  syncBranch?: string
+  /** Git 代理，如 http://127.0.0.1:7890；null = 直连 */
+  syncProxy?: string | null
+  /** 上次同步成功时间（ISO） */
+  syncLastAt?: string | null
+  /** 上次同步结果 */
+  syncLastResult?: 'ok' | 'error' | null
+  /** 上次同步失败的简短原因 */
+  syncLastMessage?: string | null
 }
 
 /** 迁移包内可移植的偏好子集（不含机器相关字段） */

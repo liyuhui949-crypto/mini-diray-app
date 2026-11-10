@@ -32,7 +32,13 @@ export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
     sidebarCollapsed: false,
     listWidth: 312,
     annotationCollapsed: false,
-    attachmentPreviewMode: 'entry'
+    attachmentPreviewMode: 'entry',
+    syncRepo: null,
+    syncBranch: 'main',
+    syncProxy: null,
+    syncLastAt: null,
+    syncLastResult: null,
+    syncLastMessage: null
   }
 }
 

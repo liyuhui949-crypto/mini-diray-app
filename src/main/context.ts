@@ -8,6 +8,7 @@ import { AttachmentStore } from './attachments/store'
 import { broadcast } from './broadcast'
 import { ExternalImporter } from './import'
 import { jobs } from './jobs'
+import { SyncService } from './sync/service'
 import { logger } from './logger'
 import { MigrationImporter } from './migration/import'
 import { PreferencesStore } from './preferences'
@@ -27,6 +28,7 @@ export class AppContext {
   readonly attachmentProtocol: AttachmentProtocol
   readonly externalImport: ExternalImporter
   readonly migrationImport: MigrationImporter
+  readonly sync: SyncService
   readonly appVersion: string
 
   private idleTimer: NodeJS.Timeout | null = null
@@ -46,6 +48,10 @@ export class AppContext {
     this.migrationImport = new MigrationImporter({
       repository: this.repository,
       store: this.attachments
+    })
+    this.sync = new SyncService({
+      repository: this.repository,
+      preferences: this.preferences
     })
   }
 

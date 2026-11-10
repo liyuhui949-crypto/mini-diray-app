@@ -17,6 +17,17 @@ export type ErrorCode =
   | 'UNSUPPORTED'
   | 'PACKAGE_KEY_REQUIRED'
   | 'PACKAGE_VERSION_UNSUPPORTED'
+  | 'GIT_NOT_FOUND'
+  | 'GIT_AUTH_FAILED'
+  | 'GIT_NETWORK'
+  | 'GIT_PROXY'
+  | 'GIT_DNS'
+  | 'SYNC_NOT_CONFIGURED'
+  | 'SYNC_CONFLICT'
+  | 'SYNC_BUSY'
+  | 'SYNC_VAULT_MISMATCH'
+  | 'SYNC_MIRROR_CORRUPT'
+  | 'ATTACHMENT_PACKAGE_INVALID'
   | 'UNKNOWN'
 
 const defaultMessages: Record<ErrorCode, string> = {
@@ -36,6 +47,17 @@ const defaultMessages: Record<ErrorCode, string> = {
   UNSUPPORTED: '不支持的操作',
   PACKAGE_KEY_REQUIRED: copy.errors.packageKeyRequired,
   PACKAGE_VERSION_UNSUPPORTED: copy.errors.packageVersionUnsupported,
+  GIT_NOT_FOUND: '没有找到系统 git，请先安装 Git 并重新打开应用',
+  GIT_AUTH_FAILED: 'Git 认证失败，请检查访问令牌是否有效',
+  GIT_NETWORK: '无法连接 Git 仓库，请检查网络或代理',
+  GIT_PROXY: '无法连接 Git 代理，请确认代理已开启',
+  GIT_DNS: '无法解析仓库域名，请检查网络或 DNS',
+  SYNC_NOT_CONFIGURED: '还没有配置 Git 同步仓库',
+  SYNC_CONFLICT: '远端与本地已分叉，请先推送或手动处理',
+  SYNC_BUSY: '另一个同步任务正在进行，请稍候',
+  SYNC_VAULT_MISMATCH: '这个仓库属于另一个日记库，不能直接同步',
+  SYNC_MIRROR_CORRUPT: '同步镜像已损坏，请重新拉取或重建镜像',
+  ATTACHMENT_PACKAGE_INVALID: '附件包无效或已损坏',
   UNKNOWN: copy.errors.unknown
 }
 

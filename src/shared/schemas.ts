@@ -114,7 +114,13 @@ export const preferencesSchema = z.object({
   sidebarCollapsed: z.boolean().optional(),
   listWidth: z.number().int().min(240).max(420).optional(),
   annotationCollapsed: z.boolean().optional(),
-  attachmentPreviewMode: z.enum(['attachment', 'entry']).optional()
+  attachmentPreviewMode: z.enum(['attachment', 'entry']).optional(),
+  syncRepo: z.string().max(2048).nullable().optional(),
+  syncBranch: z.string().min(1).max(120).optional(),
+  syncProxy: z.string().max(2048).nullable().optional(),
+  syncLastAt: z.string().max(64).nullable().optional(),
+  syncLastResult: z.enum(['ok', 'error']).nullable().optional(),
+  syncLastMessage: z.string().max(500).nullable().optional()
 })
 
 export const portablePreferencesSchema = z.object({

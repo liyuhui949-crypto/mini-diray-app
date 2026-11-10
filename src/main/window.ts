@@ -17,7 +17,14 @@ export function forgetWebContents(webContents: WebContents): void {
   trusted.delete(webContents.id)
 }
 
-function isDev(): boolean {
+/** 给额外窗口（同步窗口）注册 trusted，避免 IPC sender 校验拒绝 */
+export function registerTrustedWindow(window: BrowserWindow): void {
+  const id = window.webContents.id
+  trusted.add(id)
+  window.on('closed', () => trusted.delete(id))
+}
+
+export function isDev(): boolean {
   return !process.env['NODE_ENV'] || process.env['NODE_ENV'] !== 'production'
 }
 
@@ -32,7 +39,7 @@ function allowedOrigin(): string | null {
 }
 
 /** 自动化测试用：窗口不在屏幕上出现，也不抢焦点 */
-function isSilent(): boolean {
+export function isSilent(): boolean {
   return process.env['MINIDIARY_SILENT'] === '1'
 }
 
@@ -66,9 +73,7 @@ export function createMainWindow(preferences: Preferences): BrowserWindow {
     }
   })
 
-  const webContentsId = window.webContents.id
-  trusted.add(webContentsId)
-  window.on('closed', () => trusted.delete(webContentsId))
+  registerTrustedWindow(window)
 
   window.once('ready-to-show', () => {
     if (silent) {
