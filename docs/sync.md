@@ -2,6 +2,8 @@
 
 Git 同步只搬**正文与批注**，不搬附件；今天的内容永远不同步。附件用 `.inkatt` 附件包手动迁移。
 
+**默认关闭。** 关闭时不会运行任何 `git` 命令，也不会让应用发起 HTTP(S)；仓库地址、密钥、代理仍保留，重新开启即可继续。
+
 ## 1. 范围与决议
 
 | 数据 | 是否进 Git | 说明 |
@@ -16,6 +18,7 @@ Git 同步只搬**正文与批注**，不搬附件；今天的内容永远不同
 - **只提交变化（M）**：镜像里内容没变的条目不会重写；git 只看到真正改过的文件。
 - **不做删除同步**：产品不提供删除单篇日记/附件的入口；今日被清空的内容本来就不在镜像里。
 - **不做自动合并**：推送/拉取都是 fast-forward；分叉时提示用户，不静默覆盖。
+- **总开关**：默认关闭；关闭态不运行 git、不联网，`.sync` 仅保留为惰性本地缓存；开启后才允许测试/拉取/推送。
 
 ## 2. 仓库与本地镜像
 
@@ -86,14 +89,17 @@ Git 同步只搬**正文与批注**，不搬附件；今天的内容永远不同
 
 ```
 minidiary-attachments.inkatt      # ZIP64
-├─ manifest.json                  # { format:"inkatt/1", vaultId, items:[{id,size,sha256}] }
+├─ key.enc                        # 公钥+私钥包裹的 DEK（scrypt + AES-GCM，不含 payload）
+├─ manifest.enc                   # 用 DEK 派生的 manifest 密钥加密的清单
 ├─ attachments/<uuid>.mdat        # 原样复制的密文
 └─ checksums.sha256               # 每个成员的 SHA-256（最后一个成员）
 ```
 
-- 导出：收集条目里引用且本地存在的附件，原样复制密文，不重新加密；
-- 导入：校验 `vaultId`、成员名、校验和、MDAT 文件头与大小；已存在且哈希一致则跳过，不一致直接报错；
-- 导入只补缺失文件，不覆盖已有附件；
+- 导出必须设置**私钥**（包密码）并保存应用生成的**公钥**；两者同时正确才能解开 `key.enc`；
+- `manifest.enc` 用解锁出的 DEK 派生密钥加密，包内看不到附件元数据；
+- 导入先校验 `key.enc`/`manifest.enc` 的校验和，再解 `key.enc`、解 `manifest.enc`，最后逐项校验 `vaultId`、MDAT 头与大小；
+- 附件包只补齐**同一个 vault**（DEK 一致）的附件；新设备先导入 `.minidiary`，不同库的附件包会被拒绝；
+- 已存在且哈希一致则跳过，不一致直接报错；只补缺失文件，不覆盖；
 - 导入完成后，正文里的占位卡自动恢复为正常媒体卡。
 
 ## 7. 缺失附件状态
@@ -106,7 +112,7 @@ minidiary-attachments.inkatt      # ZIP64
 | 日记列表 | `缺 n 附件` 角标 |
 | 编辑器状态栏 | `n 个附件（m 个未迁移）` |
 
-- 打开同步窗口数据页 → 导入 `.inkatt` → 占位卡消失；
+- 打开侧栏「同步」的数据页 → 导入 `.inkatt` → 占位卡消失；
 - 缺失只表示“本机没有文件”，不猜测原因，也不自动删除元数据；
 - 导出/迁移时缺失附件会跳过，不会生成假的明文文件。
 
@@ -119,11 +125,11 @@ minidiary-attachments.inkatt      # ZIP64
 - 一个 GitHub Personal Access Token（fine-grained 至少给目标仓库 Contents: **Read and write**，或 classic `repo`）。
   不需要填写用户名：应用固定用 `x-access-token` 作为 Basic 用户名，真正身份由 token 决定。
 
-### 8.2 同步窗口
+### 8.2 同步面板
 
-侧栏「同步」打开独立窗口，两个页签：
+侧栏「同步」在右侧主区域打开面板（与设置同一布局），两个页签：
 
-- **Git 同步**：状态 / 拉取 / 推送 / 仓库地址 / 令牌 / 代理；
+- **Git 同步**：总开关（默认关闭）/ 状态 / 拉取 / 推送 / 仓库地址 / 令牌 / 代理；关闭时仍可编辑配置，但不会启动 git；
 - **数据**：日记目录、一键迁移（`.minidiary`）、仅迁移附件（`.inkatt`）、清空全部数据。
 
 令牌只存系统钥匙串（Electron `safeStorage`），不写偏好、不写日志、不进迁移包。
@@ -142,7 +148,8 @@ Git 仓库只有条目/批注密文，没有 DEK 信封。新设备必须先有*
 
 | 情况 | 行为 |
 |---|---|
-| 找不到 git | 同步窗口提示安装；不打包 git |
+| 同步未开启 | 测试/拉取/推送直接拒绝（`SYNC_DISABLED`），不运行 git、不联网 |
+| 找不到 git | 同步面板提示安装；不打包 git |
 | 令牌失效 / 无权限 | 401：`令牌无效或已过期`；403 / `Write access to repository not granted`：令牌没有写权限（Fine-grained 需 Contents: Read and write、选中仓库、组织需 SSO）；本地内容不丢 |
 | 代理不通 / DNS 失败 | 分类提示；代理仅应用内配置生效 |
 | 远端非 fast-forward | 拉取报分叉，要求先推送或手动处理 |
@@ -156,4 +163,4 @@ Git 仓库只有条目/批注密文，没有 DEK 信封。新设备必须先有*
 - `tests/unit/sync-git.test.ts`：本地 bare 仓库提交/推送/拉取/合并；
 - `tests/unit/sync-service.test.ts`：服务层 configure/push/pull（本地 file remote）；
 - `tests/unit/inkatt.test.ts`：附件包导出、删除后导入补齐、重复导入跳过；
-- `tests/e2e/sync.spec.ts`：同步窗口两页签、缺失附件占位/角标/状态栏。
+- `tests/e2e/sync.spec.ts`：同步面板两页签、缺失附件占位/角标/状态栏。

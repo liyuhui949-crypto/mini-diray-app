@@ -1811,7 +1811,7 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
   推送只提交有变化的文件（M）；拉取 ff-only 后解密合并，今天/未来日期不参与；
 - **附件缺失态**：正文占位卡、列表 `缺 n 附件`、状态栏 `n 个（m 个未迁移）` 三处联动；
   `.inkatt` 导入校验 `vaultId`/SHA-256/MDAT 头，只补缺失；
-- **同步窗口**：独立 BrowserWindow，`Git 同步 / 数据` 两页签；数据页含目录、一键迁移、仅迁移附件、清空；
+- **同步面板**：右侧主区域与设置同布局，`Git 同步 / 数据` 两页签；数据页含目录、一键迁移、仅迁移附件、清空；
 - **不做**：删除同步、墓碑、自动合并、附件进 Git、自动定时推送；清空/改目录会断开同步；
 - 文档：[docs/sync.md](sync.md)；单测 4 个文件 + e2e 1 条；`pnpm verify` 与全量 e2e 全绿。
 
