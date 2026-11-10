@@ -8,6 +8,7 @@ import { AppError } from '@shared/errors'
 import { escapeHtml } from '@shared/markdown'
 
 import { logger } from '../logger'
+import { installNetworkGuard } from '../net-guard'
 import { randomUuid } from '../vault/crypto'
 
 export const PRINT_SCHEME = 'print'
@@ -174,6 +175,8 @@ export async function exportPdf(options: {
 
   const partition = `print-${token}`
   const printSession = session.fromPartition(partition, { cache: false })
+  // PDF 只允许本地 attachment:// 资源，不允许远程图片把正文打印变成网络请求
+  installNetworkGuard(printSession, () => false)
 
   const serve = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)

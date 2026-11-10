@@ -6,6 +6,8 @@ type SyncLastResult = 'ok' | 'error' | null
 
 /** 同步窗口顶部状态；不含 token */
 export interface SyncStatus {
+  /** 总开关；关闭时不运行 git、不联网 */
+  enabled: boolean
   /** 仓库地址已配置 */
   configured: boolean
   /** 本机是否找得到系统 git */

@@ -9,6 +9,11 @@ import { logger } from './logger'
 
 const trusted = new Set<number>()
 
+const COMPACT_BOUNDS = { width: 480, height: 600, minWidth: 400, minHeight: 480 }
+let mainWindow: BrowserWindow | null = null
+let expandedBounds: Electron.Rectangle | null = null
+let expandedMaximized = false
+
 export function isTrustedWebContents(webContents: WebContents): boolean {
   return trusted.has(webContents.id)
 }
@@ -43,6 +48,33 @@ export function isSilent(): boolean {
   return process.env['MINIDIARY_SILENT'] === '1'
 }
 
+/** 锁定后只保留密码框需要的空间；解锁时恢复原来的窗口尺寸 */
+export function setMainWindowLocked(locked: boolean): void {
+  const window = mainWindow
+  if (!window || window.isDestroyed()) return
+  if (locked) {
+    if (!window.isFullScreen()) expandedBounds = window.getNormalBounds()
+    expandedMaximized = window.isMaximized()
+    if (window.isMaximized()) window.unmaximize()
+    window.setMinimumSize(COMPACT_BOUNDS.minWidth, COMPACT_BOUNDS.minHeight)
+    window.setSize(COMPACT_BOUNDS.width, COMPACT_BOUNDS.height)
+    window.center()
+    return
+  }
+  window.setMinimumSize(960, 620)
+  if (expandedBounds) {
+    window.setBounds(expandedBounds)
+    expandedBounds = null
+  } else {
+    window.setSize(1440, 920)
+    window.center()
+  }
+  if (expandedMaximized) {
+    expandedMaximized = false
+    window.maximize()
+  }
+}
+
 export function createMainWindow(preferences: Preferences): BrowserWindow {
   const silent = isSilent()
   const window = new BrowserWindow({
@@ -74,6 +106,10 @@ export function createMainWindow(preferences: Preferences): BrowserWindow {
   })
 
   registerTrustedWindow(window)
+  mainWindow = window
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null
+  })
 
   window.once('ready-to-show', () => {
     if (silent) {

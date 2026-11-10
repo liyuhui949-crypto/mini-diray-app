@@ -233,5 +233,100 @@ export function createVaultData(now: Date = new Date()): VaultData {
   }
 }
 
+/** .inkatt 的公钥+私钥信封：只包裹 DEK，不包含 payload */
+export const PACKAGE_KEY_MAGIC = 'MINIDIARY-PACKAGE-KEY'
+export const PACKAGE_KEY_VERSION = 1
+
+export interface PackageKeyEnvelope {
+  magic: typeof PACKAGE_KEY_MAGIC
+  formatVersion: number
+  vaultId: string
+  createdAt: string
+  kdf: KdfDescriptor
+  keyWrap: CipherBlock
+}
+
+export const packageKeyEnvelopeSchema = z.object({
+  magic: z.literal(PACKAGE_KEY_MAGIC),
+  formatVersion: z.literal(PACKAGE_KEY_VERSION),
+  vaultId: z.string().min(1),
+  createdAt: z.string().min(1),
+  kdf: kdfSchema,
+  keyWrap: cipherBlockSchema
+})
+
+function packageKeyAad(kdf: KdfDescriptor, vaultId: string): string {
+  return `${PACKAGE_KEY_MAGIC}|keyWrap|${PACKAGE_KEY_VERSION}|${vaultId}|${kdf.name}|${kdf.N}|${kdf.r}|${kdf.p}|${kdf.salt}`
+}
+
+/** 用「公钥+私钥」组合口令包裹 DEK；用于附件包，不改变原 vault */
+export async function createPackageKeyEnvelope(
+  envelope: VaultEnvelope,
+  dek: Buffer,
+  secret: string,
+  params: ScryptParams = SCRYPT_PARAMS
+): Promise<PackageKeyEnvelope> {
+  const salt = newSalt()
+  const kdf: KdfDescriptor = {
+    name: 'scrypt',
+    N: params.N,
+    r: params.r,
+    p: params.p,
+    salt: salt.toString('base64')
+  }
+  const kek = await deriveKek(secret, salt, kdf)
+  try {
+    return {
+      magic: PACKAGE_KEY_MAGIC,
+      formatVersion: PACKAGE_KEY_VERSION,
+      vaultId: envelope.vaultId,
+      createdAt: new Date().toISOString(),
+      kdf,
+      keyWrap: encryptSecret(kek, dek, packageKeyAad(kdf, envelope.vaultId))
+    }
+  } finally {
+    wipe(kek)
+  }
+}
+
+/** 解开附件包信封，返回 DEK；公钥/私钥错误统一 WRONG_PASSWORD */
+export async function openPackageKeyEnvelope(
+  keyEnvelope: PackageKeyEnvelope,
+  secret: string
+): Promise<Buffer> {
+  if (
+    keyEnvelope.magic !== PACKAGE_KEY_MAGIC ||
+    keyEnvelope.formatVersion !== PACKAGE_KEY_VERSION ||
+    !keyEnvelope.vaultId ||
+    !keyEnvelope.kdf
+  ) {
+    throw new AppError('WRONG_PASSWORD')
+  }
+  const salt = Buffer.from(keyEnvelope.kdf.salt, 'base64')
+  const { N, r, p } = keyEnvelope.kdf
+  // 包可能来自外部：限制 KDF 参数，避免恶意包用超大 N 造成内存/CPU DoS
+  if (
+    !Number.isInteger(N) ||
+    !Number.isInteger(r) ||
+    !Number.isInteger(p) ||
+    N < 2 ** 14 ||
+    N > 2 ** 19 ||
+    r < 1 ||
+    r > 16 ||
+    p < 1 ||
+    p > 8 ||
+    salt.length < 8 ||
+    salt.length > 64
+  ) {
+    throw new AppError('WRONG_PASSWORD')
+  }
+  const kek = await deriveKek(secret, salt, keyEnvelope.kdf)
+  try {
+    return decryptSecret(kek, keyEnvelope.keyWrap, packageKeyAad(keyEnvelope.kdf, keyEnvelope.vaultId))
+  } finally {
+    wipe(kek)
+  }
+}
+
 /** 迁移包里的 `vault.inkv` 与本地信封结构一致，这里只需换一个文件名 */
 export const MIGRATION_VAULT_MEMBER = 'vault.inkv'

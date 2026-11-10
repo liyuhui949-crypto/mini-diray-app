@@ -115,6 +115,7 @@ export const preferencesSchema = z.object({
   listWidth: z.number().int().min(240).max(420).optional(),
   annotationCollapsed: z.boolean().optional(),
   attachmentPreviewMode: z.enum(['attachment', 'entry']).optional(),
+  syncEnabled: z.boolean().optional(),
   syncRepo: z.string().max(2048).nullable().optional(),
   syncBranch: z.string().min(1).max(120).optional(),
   syncProxy: z.string().max(2048).nullable().optional(),

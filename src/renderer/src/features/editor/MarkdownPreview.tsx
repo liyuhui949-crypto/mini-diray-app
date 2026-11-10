@@ -228,7 +228,7 @@ export function MissingAttachmentCard({ attachment }: { attachment: Attachment }
         type="button"
         className={styles.missingAction}
         onClick={() => {
-          void call('sync:openWindow', { tab: 'data' })
+          useUiStore.getState().openSync('data')
         }}
       >
         去迁移 →

@@ -37,9 +37,8 @@ import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
 import { exportAttachmentPackage, importAttachmentPackage } from '../sync/attachmentPackage'
 import { syncRoot } from '../sync/mirror'
-import { openSyncWindow } from '../sync/window'
 import { ensureVaultDirs, removePath, vaultPaths } from '../vault/paths'
-import { isTrustedWebContents } from '../window'
+import { isTrustedWebContents, setMainWindowLocked } from '../window'
 
 function resolveTheme(context: AppContext): ThemeSource {
   const { theme } = context.preferences.current
@@ -148,11 +147,14 @@ export function registerIpcHandlers(context: AppContext): void {
   register('vault:create', async ({ password }) => {
     const snapshot = await repository.create(password)
     await ensureVaultDirs(vaultPaths(context.diaryDir))
+    setMainWindowLocked(false)
     return snapshot
   })
 
   register('vault:unlock', async ({ password }) => {
-    return repository.unlock(password)
+    const snapshot = await repository.unlock(password)
+    setMainWindowLocked(false)
+    return snapshot
   })
 
   register('vault:snapshot', async () => repository.getSnapshot())
@@ -462,13 +464,11 @@ export function registerIpcHandlers(context: AppContext): void {
 
   // ───────────────────────── stats ─────────────────────────
   // ───────────────────────── git sync / attachment package ─────────────────────────
-  register('sync:openWindow', async ({ tab }) => {
-    openSyncWindow(tab ?? 'git')
-  })
-
   register('sync:status', async () => context.sync.status())
 
   register('sync:configure', async (payload) => context.sync.configure(payload))
+
+  register('sync:setEnabled', async ({ enabled }) => context.sync.setEnabled(enabled))
 
   register('sync:test', async () => context.sync.test())
 
@@ -488,32 +488,23 @@ export function registerIpcHandlers(context: AppContext): void {
 
   register('sync:missingAttachments', async () => context.sync.missingAttachments())
 
-  register('sync:openMigration', async ({ kind }, event) => {
-    const main = BrowserWindow.getAllWindows().find(
-      (window) => !window.isDestroyed() && window.webContents.id !== event.sender.id
-    )
-    if (!main) throw new AppError('NOT_FOUND', '找不到主窗口')
-    parentWindow(event)?.close()
-    main.show()
-    main.focus()
-    main.webContents.send(EVENTS.menuCommand, kind === 'export' ? 'migration-export' : 'migration-import')
-  })
-
-  register('attachment:exportPackage', async (_payload, event) => {
+  register('attachment:exportPackage', async (payload, event) => {
     const result = await exportAttachmentPackage(
       repository,
       path.join(context.diaryDir, 'attachments'),
-      parentWindow(event)
+      parentWindow(event),
+      payload
     )
     if (result.path) await preferences.update({ lastExportDir: path.dirname(result.path) })
     return result
   })
 
-  register('attachment:importPackage', async (_payload, event) => {
+  register('attachment:importPackage', async (payload, event) => {
     const result = await importAttachmentPackage(
       repository,
       path.join(context.diaryDir, 'attachments'),
-      parentWindow(event)
+      parentWindow(event),
+      payload
     )
     const missing = (await context.sync.missingAttachments()).length
     broadcast(EVENTS.attachmentsChanged, { missing })

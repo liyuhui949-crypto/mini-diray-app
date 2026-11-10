@@ -1,8 +1,9 @@
 import { todayLocalDate } from '@shared/date'
+import type { SyncTab } from '@shared/sync'
 import type { LocalDate, OrphanAttachment, Preferences } from '@shared/types'
 import { create } from 'zustand'
 
-export type ViewName = 'editor' | 'stats' | 'settings' | 'search' | 'attachments'
+export type ViewName = 'editor' | 'stats' | 'settings' | 'search' | 'attachments' | 'sync'
 
 /** 「在日记中打开」的一次性请求：跳到某天并把检索词标出来 */
 export interface SearchJump {
@@ -50,6 +51,8 @@ interface UiState {
   /** 未引用附件的灯箱上下文（没有 entry 元数据） */
   lightboxOrphan: OrphanAttachment | null
   toasts: ToastItem[]
+  /** 同步面板当前页签 */
+  syncTab: SyncTab
   /** 编辑器预览模式：跨日记保留，切日期不重置 */
   previewMode: boolean
   /** 日历当前显示月份（每月 1 号） */
@@ -66,6 +69,8 @@ interface UiState {
   attachmentPreviewAttachmentId: string | null
   searchJump: SearchJump | null
   setView: (view: ViewName) => void
+  openSync: (tab?: SyncTab) => void
+  setSyncTab: (tab: SyncTab) => void
   openSearchPreview: (date: LocalDate) => void
   closeSearchPreview: () => void
   openAttachmentPreview: (date: LocalDate, attachmentId?: string | null) => void
@@ -102,6 +107,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   lightboxDate: null,
   lightboxOrphan: null,
   toasts: [],
+  syncTab: 'git',
   previewMode: false,
   calendarMonth: todayLocalDate(),
   listScope: 'month',
@@ -113,6 +119,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   attachmentPreviewAttachmentId: null,
   searchJump: null,
   setView: (view) => set({ view, dialog: null }),
+  openSync: (tab = 'git') => set({ view: 'sync', dialog: null, syncTab: tab }),
+  setSyncTab: (tab) => set({ syncTab: tab }),
   openSearchPreview: (searchPreviewDate) => set({ searchPreviewDate }),
   closeSearchPreview: () => set({ searchPreviewDate: null }),
   openAttachmentPreview: (attachmentPreviewDate, attachmentPreviewAttachmentId = null) =>

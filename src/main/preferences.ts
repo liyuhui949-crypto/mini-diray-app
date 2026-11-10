@@ -33,6 +33,7 @@ export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
     listWidth: 312,
     annotationCollapsed: false,
     attachmentPreviewMode: 'entry',
+    syncEnabled: false,
     syncRepo: null,
     syncBranch: 'main',
     syncProxy: null,

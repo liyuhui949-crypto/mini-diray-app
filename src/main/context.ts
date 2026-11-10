@@ -13,6 +13,7 @@ import { logger } from './logger'
 import { MigrationImporter } from './migration/import'
 import { PreferencesStore } from './preferences'
 import { VaultRepository } from './vault/repository'
+import { setMainWindowLocked } from './window'
 import { cleanupStaleArtifacts } from './vault/rollback'
 
 const IDLE_POLL_MS = 15_000
@@ -110,6 +111,7 @@ export class AppContext {
   async lock(reason: 'manual' | 'screen-lock' | 'suspend' | 'idle' | 'fatal'): Promise<void> {
     if (!this.repository.isUnlocked) {
       broadcast(EVENTS.vaultLocked, { reason })
+      setMainWindowLocked(true)
       return
     }
     if (this.locking) {
@@ -126,6 +128,7 @@ export class AppContext {
       await this.repository.flush().catch(() => undefined)
       this.repository.lock()
       broadcast(EVENTS.vaultLocked, { reason })
+      setMainWindowLocked(true)
       logger.info('vault locked', { reason })
     })().finally(() => {
       this.locking = null

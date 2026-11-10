@@ -3,20 +3,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { copy } from '@shared/copy'
 import { formatBytes } from '@shared/date'
 import type { Preferences, StorageStats } from '@shared/types'
-import type { SyncStatus, SyncTab } from '@shared/sync'
+import type { SyncStatus } from '@shared/sync'
 
-import { call, errorMessage, subscribe } from '@/api/client'
-import { Button, Dialog, Field, ToastHost } from '@/components/ui'
+import { call, errorMessage } from '@/api/client'
+import { Button, Dialog, Field, Switch } from '@/components/ui'
 import { useUiStore } from '@/stores/ui'
 
+import { AttachmentExportDialog, AttachmentImportDialog } from './AttachmentPackageDialogs'
 import styles from './sync.module.scss'
 
-type Loading = 'push' | 'pull' | 'test' | 'save' | 'export' | 'import' | 'reset' | null
-
-function initialTab(): SyncTab {
-  const value = new URLSearchParams(window.location.search).get('tab')
-  return value === 'data' ? 'data' : 'git'
-}
+type Loading = 'push' | 'pull' | 'test' | 'save' | 'reset' | 'toggle' | null
 
 function repoLabel(repo: string | null): string {
   if (!repo) return copy.sync.repoUnset
@@ -45,8 +41,9 @@ function statusLine(status: SyncStatus | null): string {
   return copy.sync.statusClean
 }
 
-export function SyncWindow(): React.JSX.Element {
-  const [tab, setTab] = useState<SyncTab>(initialTab)
+export function SyncPane(): React.JSX.Element {
+  const tab = useUiStore((state) => state.syncTab)
+  const setTab = useUiStore((state) => state.setSyncTab)
   const [status, setStatus] = useState<SyncStatus | null>(null)
   const [prefs, setPrefs] = useState<Preferences | null>(null)
   const [stats, setStats] = useState<StorageStats | null>(null)
@@ -58,6 +55,8 @@ export function SyncWindow(): React.JSX.Element {
   const [proxyInput, setProxyInput] = useState('')
   const [tokenInput, setTokenInput] = useState('')
   const [resetOpen, setResetOpen] = useState(false)
+  const [attachmentExportOpen, setAttachmentExportOpen] = useState(false)
+  const [attachmentImportOpen, setAttachmentImportOpen] = useState(false)
   const [resetPassword, setResetPassword] = useState('')
   const [resetDelete, setResetDelete] = useState('')
   const pushToast = useUiStore((state) => state.pushToast)
@@ -73,7 +72,6 @@ export function SyncWindow(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    document.title = '同步 — Mini Diary'
     void (async () => {
       try {
         const nextPrefs = await call('prefs:read', undefined)
@@ -91,24 +89,6 @@ export function SyncWindow(): React.JSX.Element {
       }
     })()
   }, [pushToast, refresh])
-
-  useEffect(() => {
-    return subscribe('sync:tab', ({ tab: next }) => setTab(next))
-  }, [])
-
-  useEffect(() => {
-    const applyTheme = (theme: string): void => {
-      if (theme !== 'system') {
-        document.documentElement.dataset['theme'] = theme
-        return
-      }
-      document.documentElement.dataset['theme'] = window.matchMedia('(prefers-color-scheme: dark)')
-        .matches
-        ? 'dark'
-        : 'light'
-    }
-    return subscribe('theme:changed', ({ theme }) => applyTheme(theme))
-  }, [])
 
   const run = async (
     kind: Loading,
@@ -167,6 +147,17 @@ export function SyncWindow(): React.JSX.Element {
     })
   }
 
+  const toggleSync = (next: boolean): void => {
+    void run(
+      'toggle',
+      async () => {
+        await call('sync:setEnabled', { enabled: next })
+        pushToast(next ? copy.sync.enabledToast : copy.sync.disabledToast, { tone: 'success' })
+      },
+      next ? '开启失败' : '关闭失败'
+    )
+  }
+
   const push = (): void => {
     void run(
       'push',
@@ -208,26 +199,6 @@ export function SyncWindow(): React.JSX.Element {
     )
   }
 
-  const exportAttachments = (): void => {
-    void run('export', async () => {
-      const result = await call('attachment:exportPackage', undefined)
-      if (!result.path) return
-      pushToast(copy.sync.attachmentExportDone(result.count, formatBytes(result.bytes)), {
-        tone: 'success'
-      })
-    })
-  }
-
-  const importAttachments = (): void => {
-    void run('import', async () => {
-      const result = await call('attachment:importPackage', undefined)
-      pushToast(
-        copy.sync.attachmentImportDone(result.imported, result.skipped, result.missing),
-        { tone: 'success' }
-      )
-    })
-  }
-
   const openDir = (): void => {
     void call('app:openDiaryDir', undefined).catch((error) => {
       pushToast(errorMessage(error), { tone: 'error' })
@@ -254,24 +225,13 @@ export function SyncWindow(): React.JSX.Element {
     })
   }
 
-  const gitReady = status?.gitAvailable !== false
+  const enabled = status?.enabled === true
+  const gitReady = enabled ? status?.gitAvailable !== false : true
   const configured = Boolean(status?.configured)
   const busy = loading !== null
 
   return (
     <div className={styles.page}>
-      <div className={styles.bar}>
-        <span className={styles.dots} aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span className={styles.title}>同步 — Mini Diary</span>
-        <button type="button" className={styles.close} aria-label={copy.sync.close} onClick={() => window.close()}>
-          ×
-        </button>
-      </div>
-
       <div className={styles.tabs} role="tablist">
         <button
           type="button"
@@ -296,10 +256,31 @@ export function SyncWindow(): React.JSX.Element {
       {tab === 'git' ? (
         <section className={styles.body}>
           <h2>{copy.sync.gitTab}</h2>
-          <p className={styles.intro}>{copy.sync.intro}</p>
+          <ul className={styles.introList}>
+            {copy.sync.intro.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
 
-          {!gitReady ? <div className={styles.warn}>{copy.sync.gitMissing}</div> : null}
-          {gitReady && !configured ? <div className={styles.warn}>{copy.sync.notConfigured}</div> : null}
+          <div className={styles.card}>
+            <div>
+              <div className={styles.label}>{copy.sync.syncSwitch}</div>
+              <div className={styles.hint}>{enabled ? copy.sync.enabledHint : copy.sync.disabledHint}</div>
+            </div>
+            <Switch
+              checked={enabled}
+              label={enabled ? copy.sync.disable : copy.sync.enable}
+              disabled={busy}
+              onChange={toggleSync}
+            />
+          </div>
+
+          {enabled ? (
+            <>
+              {!gitReady ? <div className={styles.warn}>{copy.sync.gitMissing}</div> : null}
+              {gitReady && !configured ? (
+                <div className={styles.warn}>{copy.sync.notConfigured}</div>
+              ) : null}
 
           <div className={styles.card}>
             <div>
@@ -311,13 +292,13 @@ export function SyncWindow(): React.JSX.Element {
               </div>
             </div>
             <div className={styles.actions}>
-              <Button size="sm" disabled={!gitReady || !configured || !status?.tokenSaved || busy} onClick={pull}>
+              <Button size="sm" disabled={!enabled || !gitReady || !configured || !status?.tokenSaved || busy} onClick={pull}>
                 {loading === 'pull' ? copy.sync.pullLoading : copy.sync.pull}
               </Button>
               <Button
                 size="sm"
                 variant="primary"
-                disabled={!gitReady || !configured || !status?.tokenSaved || busy}
+                disabled={!enabled || !gitReady || !configured || !status?.tokenSaved || busy}
                 onClick={push}
               >
                 {loading === 'push' ? copy.sync.pushLoading : copy.sync.push}
@@ -443,6 +424,8 @@ export function SyncWindow(): React.JSX.Element {
               </Button>
             </div>
           </div>
+            </>
+          ) : null}
         </section>
       ) : (
         <section className={styles.body}>
@@ -478,7 +461,7 @@ export function SyncWindow(): React.JSX.Element {
               <Button
                 size="sm"
                 disabled={busy}
-                onClick={() => void call('sync:openMigration', { kind: 'import' })}
+                onClick={() => useUiStore.getState().openDialog('migrationImport')}
               >
                 {copy.sync.migrationImport}
               </Button>
@@ -486,7 +469,7 @@ export function SyncWindow(): React.JSX.Element {
                 size="sm"
                 variant="primary"
                 disabled={busy}
-                onClick={() => void call('sync:openMigration', { kind: 'export' })}
+                onClick={() => useUiStore.getState().openDialog('migrationExport')}
               >
                 {copy.sync.migrationExport}
               </Button>
@@ -502,11 +485,16 @@ export function SyncWindow(): React.JSX.Element {
               </div>
             </div>
             <div className={styles.actions}>
-              <Button size="sm" disabled={busy} onClick={importAttachments}>
-                {loading === 'import' ? '导入中…' : copy.sync.attachmentImport}
+              <Button size="sm" disabled={busy} onClick={() => setAttachmentImportOpen(true)}>
+                {copy.sync.attachmentImport}
               </Button>
-              <Button size="sm" variant="primary" disabled={busy} onClick={exportAttachments}>
-                {loading === 'export' ? '导出中…' : copy.sync.attachmentExport}
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy}
+                onClick={() => setAttachmentExportOpen(true)}
+              >
+                {copy.sync.attachmentExport}
               </Button>
             </div>
           </div>
@@ -568,7 +556,31 @@ export function SyncWindow(): React.JSX.Element {
         </Field>
       </Dialog>
 
-      <ToastHost />
+      <AttachmentExportDialog
+        open={attachmentExportOpen}
+        onClose={() => setAttachmentExportOpen(false)}
+        onDone={(result) => {
+          pushToast(copy.sync.attachmentExportDone(result.count, formatBytes(result.bytes)), {
+            tone: 'success'
+          })
+          void refresh()
+          void call('stats:storage', undefined).then(setStats).catch(() => undefined)
+        }}
+      />
+
+      <AttachmentImportDialog
+        open={attachmentImportOpen}
+        onClose={() => setAttachmentImportOpen(false)}
+        onDone={(result) => {
+          pushToast(
+            copy.sync.attachmentImportDone(result.imported, result.skipped, result.missing),
+            { tone: 'success' }
+          )
+          void refresh()
+          void call('stats:storage', undefined).then(setStats).catch(() => undefined)
+        }}
+      />
+
     </div>
   )
 }

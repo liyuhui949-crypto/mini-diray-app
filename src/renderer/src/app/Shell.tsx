@@ -27,6 +27,7 @@ import { EditorPane } from '@/features/editor/EditorPane'
 import { EntryList } from '@/features/entry-list/EntryList'
 import { PreferencesPane } from '@/features/preferences/PreferencesPane'
 import { SearchPane } from '@/features/search/SearchPane'
+import { SyncPane } from '@/sync/SyncPane'
 import { StatsPane } from '@/features/stats/StatsPane'
 import { useEntriesStore } from '@/stores/entries'
 import { persistLayout, usePrefsStore } from '@/stores/prefs'
@@ -91,6 +92,7 @@ export function Shell(): React.JSX.Element {
           {view === 'stats' ? <StatsPane /> : null}
           {view === 'attachments' ? <AttachmentLibraryPane /> : null}
           {view === 'settings' ? <PreferencesPane /> : null}
+          {view === 'sync' ? <SyncPane /> : null}
         </main>
       </div>
 
@@ -314,10 +316,10 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
 
       <div className={styles.sideFooter}>
         <NavButton
-          active={false}
+          active={view === 'sync'}
           icon={<Cloud size={15} />}
           label={copy.sync.title}
-          onClick={() => void call('sync:openWindow', { tab: 'git' })}
+          onClick={() => useUiStore.getState().openSync('git')}
         />
         <NavButton
           active={view === 'attachments'}
@@ -340,7 +342,6 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
         <NavButton
           icon={<Lock size={15} />}
           label={copy.sidebar.lock}
-          shortcut="⌘L"
           onClick={() => {
             void call('vault:lock', undefined)
           }}
@@ -353,12 +354,11 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
 interface NavButtonProps {
   icon: React.ReactNode
   label: string
-  shortcut?: string
   active?: boolean
   onClick: () => void
 }
 
-function NavButton({ icon, label, shortcut, active, onClick }: NavButtonProps): React.JSX.Element {
+function NavButton({ icon, label, active, onClick }: NavButtonProps): React.JSX.Element {
   return (
     <button
       type="button"
@@ -367,7 +367,6 @@ function NavButton({ icon, label, shortcut, active, onClick }: NavButtonProps): 
     >
       {icon}
       <span>{label}</span>
-      {shortcut ? <kbd>{shortcut}</kbd> : null}
     </button>
   )
 }

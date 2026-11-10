@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
@@ -33,7 +34,10 @@ import {
   SUPPORTED_SCHEMA_VERSION,
   assertSupportedSchema,
   createEnvelope,
+  createPackageKeyEnvelope,
   createVaultData,
+  openPackageKeyEnvelope,
+  type PackageKeyEnvelope,
   openEnvelope,
   parseEnvelope,
   payloadAad,
@@ -163,6 +167,39 @@ export class VaultRepository {
       this.syncKeyCache = deriveSubkey(this.dek, this.envelope?.vaultId ?? '', 'sync-v1')
     }
     return this.syncKeyCache
+  }
+
+  /** 生成 .inkatt 的 key.enc，并返回附件 manifest 用的派生密钥 */
+  async createAttachmentPackageKey(
+    secret: string
+  ): Promise<{ keyEnvelope: PackageKeyEnvelope; manifestKey: Buffer }> {
+    this.assertUnlocked()
+    const envelope = this.envelope
+    const dek = this.dek
+    if (!envelope || !dek) throw new AppError('VAULT_LOCKED')
+    const keyEnvelope = await createPackageKeyEnvelope(envelope, dek, secret)
+    return {
+      keyEnvelope,
+      manifestKey: deriveSubkey(dek, envelope.vaultId, 'inkatt-manifest-v1')
+    }
+  }
+
+  /** 解开 .inkatt 的 key.enc，校验它属于当前库，返回 manifest 密钥 */
+  async openAttachmentPackageKey(keyEnvelope: PackageKeyEnvelope, secret: string): Promise<Buffer> {
+    this.assertUnlocked()
+    const envelope = this.envelope
+    const dek = this.dek
+    if (!envelope || !dek) throw new AppError('VAULT_LOCKED')
+    if (keyEnvelope.vaultId !== envelope.vaultId) throw new AppError('SYNC_VAULT_MISMATCH')
+    const packageDek = await openPackageKeyEnvelope(keyEnvelope, secret)
+    try {
+      if (packageDek.length !== dek.length || !timingSafeEqual(packageDek, dek)) {
+        throw new AppError('WRONG_PASSWORD')
+      }
+    } finally {
+      wipe(packageDek)
+    }
+    return deriveSubkey(dek, envelope.vaultId, 'inkatt-manifest-v1')
   }
 
   /** 迁移导入重加密批注时使用的密钥；永不跨 IPC */

@@ -104,6 +104,8 @@ export interface Preferences {
   annotationCollapsed?: boolean
   /** 附件库点击可预览附件时的默认行为：直接看附件，还是看所属日记 */
   attachmentPreviewMode?: 'attachment' | 'entry'
+  /** Git 同步总开关；默认关闭，关闭时不运行 git、不联网 */
+  syncEnabled?: boolean
   /** Git 同步仓库地址（HTTPS）；null = 未配置 */
   syncRepo?: string | null
   /** Git 分支，默认 main */

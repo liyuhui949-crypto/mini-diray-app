@@ -21,7 +21,7 @@ import type {
   ThemeSource,
   VaultSnapshot
 } from './types'
-import type { SyncMissingAttachment, SyncStatus, SyncTab, SyncTestResult } from './sync'
+import type { SyncMissingAttachment, SyncStatus, SyncTestResult } from './sync'
 import type { ErrorPayload } from './errors'
 import {
   ANNOTATION_BODY_MAX_LENGTH,
@@ -47,7 +47,6 @@ export const EVENTS = {
   jobDone: 'job:done',
   jobError: 'job:error',
   openPackage: 'migration:open-package',
-  syncTab: 'sync:tab',
   attachmentsChanged: 'attachments:changed',
   vaultReset: 'vault:reset',
   syncApplied: 'sync:applied'
@@ -65,7 +64,6 @@ export interface EventPayloads {
   'job:done': JobDonePayload
   'job:error': JobErrorPayload
   'migration:open-package': { path: string }
-  'sync:tab': { tab: SyncTab }
   'attachments:changed': { missing: number }
   'vault:reset': VaultSnapshot
   'sync:applied': VaultSnapshot
@@ -162,24 +160,23 @@ export interface IpcContract {
 
   'stats:storage': { req: void; res: StorageStats }
 
-  'sync:openWindow': { req: { tab?: SyncTab }; res: void }
   'sync:status': { req: void; res: SyncStatus }
   'sync:configure': {
     req: { repo: string; branch?: string; proxy?: string | null; token?: string }
     res: SyncStatus
   }
+  'sync:setEnabled': { req: { enabled: boolean }; res: SyncStatus }
   'sync:test': { req: void; res: SyncTestResult }
   'sync:push': { req: void; res: { commits: number; changed: number } }
   'sync:pull': { req: void; res: { entries: number; annotations: number } }
   'sync:missingAttachments': { req: void; res: SyncMissingAttachment[] }
-  'sync:openMigration': { req: { kind: 'export' | 'import' }; res: void }
 
   'attachment:exportPackage': {
-    req: void
+    req: { packageKey: string; packagePassword: string }
     res: { path: string | null; count: number; bytes: number }
   }
   'attachment:importPackage': {
-    req: void
+    req: { packageKey: string; packagePassword: string }
     res: { imported: number; skipped: number; missing: number }
   }
 }

@@ -103,15 +103,18 @@ export class SyncService {
 
   async status(): Promise<SyncStatus> {
     const prefs = this.preferences.current
+    const enabled = prefs.syncEnabled === true
     const repo = prefs.syncRepo ?? null
     let gitAvailable = false
     let gitVersion: string | null = null
-    try {
-      const git = await findGit()
-      gitAvailable = true
-      gitVersion = git.version
-    } catch {
-      gitAvailable = false
+    if (enabled) {
+      try {
+        const git = await findGit()
+        gitAvailable = true
+        gitVersion = git.version
+      } catch {
+        gitAvailable = false
+      }
     }
 
     const token = await this.secrets.get().catch(() => null)
@@ -119,7 +122,7 @@ export class SyncService {
     let behind = 0
     let tracking = false
     let dirty = false
-    if (repo && gitAvailable && (await isGitRepo(syncRoot(this.repository.vaultDir)))) {
+    if (enabled && repo && gitAvailable && (await isGitRepo(syncRoot(this.repository.vaultDir)))) {
       try {
         const result = await aheadBehind({ ...this.localOptions(), token })
         ahead = result.ahead
@@ -132,6 +135,7 @@ export class SyncService {
     }
 
     return {
+      enabled,
       configured: Boolean(repo),
       gitAvailable,
       gitVersion,
@@ -166,13 +170,27 @@ export class SyncService {
       syncProxy: normalizeProxy(input.proxy)
     })
 
-    const cwd = syncRoot(this.repository.vaultDir)
-    await initRepo(cwd, repo)
+    if (this.preferences.current.syncEnabled === true) await this.prepareRepo()
     return this.status()
+  }
+
+  private assertEnabled(): void {
+    if (this.preferences.current.syncEnabled !== true) {
+      throw new AppError('SYNC_DISABLED')
+    }
+  }
+
+  async setEnabled(enabled: boolean): Promise<SyncStatus> {
+    return this.withLock(async () => {
+      if (enabled) await this.prepareRepo()
+      await this.preferences.update({ syncEnabled: enabled })
+      return this.status()
+    })
   }
 
   async test(): Promise<SyncTestResult> {
     return this.withLock(async () => {
+      this.assertEnabled()
       const prefs = this.preferences.current
       if (!prefs.syncRepo) throw new AppError('SYNC_NOT_CONFIGURED')
       const token = await this.tokenOrThrow()
@@ -191,12 +209,16 @@ export class SyncService {
     })
   }
 
-  private async ensureRepo(): Promise<void> {
-    const prefs = this.preferences.current
-    if (!prefs.syncRepo) throw new AppError('SYNC_NOT_CONFIGURED')
+  /** 探测系统 git，并在已配置仓库时初始化本地 .sync（纯本地操作） */
+  private async prepareRepo(): Promise<void> {
     await findGit()
-    const cwd = syncRoot(this.repository.vaultDir)
-    await initRepo(cwd, prefs.syncRepo)
+    const repo = this.preferences.current.syncRepo
+    if (repo) await initRepo(syncRoot(this.repository.vaultDir), repo)
+  }
+
+  private async ensureRepo(): Promise<void> {
+    if (!this.preferences.current.syncRepo) throw new AppError('SYNC_NOT_CONFIGURED')
+    await this.prepareRepo()
   }
 
   private async hasHead(cwd: string): Promise<boolean> {
@@ -210,6 +232,7 @@ export class SyncService {
 
   async push(): Promise<{ commits: number; changed: number }> {
     return this.withLock(async () => {
+      this.assertEnabled()
       if (!this.repository.isUnlocked) throw new AppError('VAULT_LOCKED')
       await this.ensureRepo()
       const prefs = this.preferences.current
@@ -233,6 +256,7 @@ export class SyncService {
 
   async pull(): Promise<{ entries: number; annotations: number }> {
     return this.withLock(async () => {
+      this.assertEnabled()
       if (!this.repository.isUnlocked) throw new AppError('VAULT_LOCKED')
       await this.ensureRepo()
       const prefs = this.preferences.current

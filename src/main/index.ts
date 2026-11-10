@@ -11,7 +11,8 @@ import { registerPrintScheme } from './export/pdf'
 import { registerIpcHandlers } from './ipc'
 import { initLogger, logger } from './logger'
 import { installApplicationMenu } from './menu'
-import { createMainWindow } from './window'
+import { installNetworkGuard } from './net-guard'
+import { createMainWindow, setMainWindowLocked } from './window'
 
 const DEV = !app.isPackaged
 
@@ -133,9 +134,11 @@ if (!singleInstance) {
 
     context = new AppContext(app.getVersion())
     await context.init()
+    installNetworkGuard(session.defaultSession, () => context?.preferences.current.syncEnabled === true)
 
     registerIpcHandlers(context)
     createMainWindow(context.preferences.current)
+    if ((await context.vaultStatus()) === 'locked') setMainWindowLocked(true)
     installApplicationMenu(context)
 
     nativeTheme.on('updated', () => {
@@ -149,9 +152,11 @@ if (!singleInstance) {
     logger.info('app ready', { version: context.appVersion, dev: DEV })
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0 && context) {
+      void (async () => {
+        if (BrowserWindow.getAllWindows().length !== 0 || !context) return
         createMainWindow(context.preferences.current)
-      }
+        if ((await context.vaultStatus()) === 'locked') setMainWindowLocked(true)
+      })()
     })
   })
 

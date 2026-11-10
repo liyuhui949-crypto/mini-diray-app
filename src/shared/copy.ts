@@ -30,7 +30,7 @@ export const copy = {
     importing: '已有迁移包？',
     importAction: '导入迁移包',
     createSuccess: '日记库已创建',
-    warning: '密码只在你脑子里。忘了就打不开了，我们也没有后门。',
+    warning: '请务必牢记密码。忘记密码后，已加密的日记内容将永久无法恢复，我们也没有办法帮你找回。',
     passwordTooShort: '密码至少 8 位',
     passwordMismatch: '两次输入的密码不一致',
     strengthWeak: '偏弱',
@@ -360,7 +360,7 @@ export const copy = {
     exportPasswordLabel: '私钥（自定义密码）',
     exportPasswordPlaceholder: '至少 8 位，可与日记密码不同',
     exportPasswordHint:
-      '导入时需要「公钥 + 这个密码」同时正确。密码只在你脑子里，忘了包就作废了——我们也没有后门。',
+      '导入时需要「公钥 + 这个密码」同时正确。请务必牢记：忘记后这个包将永久无法打开，我们也没有办法帮你找回。',
     exportNext: '生成公钥',
     exportStart: '开始导出',
     keyTitle: '公钥已生成',
@@ -443,8 +443,21 @@ export const copy = {
     title: '同步',
     gitTab: 'Git 同步',
     dataTab: '数据',
-    intro:
-      '只有正文与批注走 Git —— 每次推送 = 一次提交，历史即备份，任何一天都可回滚；仓库里只有密文（entries/*.ink · annotations/*.ann）。今天的内容不会同步；附件不进入 Git，用「数据 → 仅迁移附件」在设备间搬运。',
+    intro: [
+      '同步默认是关闭的，需要手动打开。',
+      '打开后只把日记正文和批注上传到 GitHub。',
+      '照片、视频和文件不会上传；换设备时用「数据 → 仅迁移附件」导入或导出。',
+      '今天写的正文和批注会先留在本机，等第二天再点「推送」才会一起同步。',
+      'GitHub 上只有加密后的文件，别人看不到内容。',
+      '每次推送都会留下一个版本。'
+    ],
+    syncSwitch: 'Git 同步',
+    enabledHint: '已开启 · 推送 / 拉取 / 测试连接会启动系统 git 并联网',
+    disabledHint: '同步已关闭 · 不运行 git、不联网；开启后继续使用已保存的仓库、密钥和代理',
+    enable: '开启同步',
+    disable: '关闭同步',
+    enabledToast: 'Git 同步已开启',
+    disabledToast: 'Git 同步已关闭 · 不会运行 git 或联网',
     status: '同步状态',
     statusIdle: '尚未连接仓库',
     statusNever: '尚未同步',
@@ -474,7 +487,6 @@ export const copy = {
     save: '保存',
     cancel: '取消',
     change: '更换…',
-    close: '关闭',
     gitMissing: '没有找到系统 git。请先安装 Git，再重新打开应用。',
     notConfigured: '先配置仓库地址和访问令牌。',
     pushLoading: '推送中…',
@@ -496,9 +508,15 @@ export const copy = {
     migrationExport: '导出…',
     attachmentPackage: '仅迁移附件',
     attachmentPackageHint:
-      '导出加密附件包（.inkatt），或导入后自动比对、只补缺失的附件',
+      '导出加密附件包（.inkatt，需公钥 + 私钥）；导入时自动比对、只补缺失的附件',
     attachmentExport: '导出…',
     attachmentImport: '导入…',
+    attachmentExportTitle: '导出附件包',
+    attachmentExportDesc:
+      '只导出已加密的附件。需要设置私钥并保存生成的公钥；导入时两者必须同时正确，公钥应用不会保存。',
+    attachmentImportTitle: '导入附件包',
+    attachmentImportDesc:
+      '输入导出时生成的公钥和私钥。校验通过后只补本机缺失的附件，已有且一致的会跳过。',
     attachmentExportDone: (count: number, bytes: string) =>
       `附件包导出完成 · ${count} 个附件（${bytes}）`,
     attachmentImportDone: (imported: number, skipped: number, missing: number) =>
