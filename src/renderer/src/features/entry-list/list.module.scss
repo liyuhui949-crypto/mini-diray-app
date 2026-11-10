@@ -216,3 +216,15 @@
     background: var(--md-bg-sunken);
   }
 }
+
+.missBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--md-warn) 35%, transparent);
+  background: color-mix(in srgb, var(--md-warn) 8%, transparent);
+  color: var(--md-warn);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}

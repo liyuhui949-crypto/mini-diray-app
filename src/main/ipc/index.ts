@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
@@ -34,7 +35,10 @@ import { jobs } from '../jobs'
 import { logger } from '../logger'
 import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
-import { ensureVaultDirs, vaultPaths } from '../vault/paths'
+import { exportAttachmentPackage, importAttachmentPackage } from '../sync/attachmentPackage'
+import { syncRoot } from '../sync/mirror'
+import { openSyncWindow } from '../sync/window'
+import { ensureVaultDirs, removePath, vaultPaths } from '../vault/paths'
 import { isTrustedWebContents } from '../window'
 
 function resolveTheme(context: AppContext): ThemeSource {
@@ -164,7 +168,13 @@ export function registerIpcHandlers(context: AppContext): void {
   register('vault:moveDirectory', async ({ targetDir }) => {
     if (!path.isAbsolute(targetDir)) throw new AppError('INVALID_INPUT', '目录必须是绝对路径')
     const result = await repository.moveDirectory(targetDir)
-    await preferences.update({ diaryDir: result.diaryDir })
+    await preferences.update({
+      diaryDir: result.diaryDir,
+      syncRepo: null,
+      syncLastAt: null,
+      syncLastResult: null,
+      syncLastMessage: null
+    })
     context.applyDiaryDir(result.diaryDir)
     return result
   })
@@ -172,6 +182,16 @@ export function registerIpcHandlers(context: AppContext): void {
   register('vault:reset', async ({ password }) => {
     const snapshot = await repository.reset(password)
     await attachments.cleanupParts()
+    // 清空数据后本地同步镜像没有意义；远端仓库保持不动，重新配置即可再同步
+    await removePath(syncRoot(context.diaryDir)).catch(() => undefined)
+    await preferences.update({
+      syncRepo: null,
+      syncLastAt: null,
+      syncLastResult: null,
+      syncLastMessage: null
+    })
+    broadcast(EVENTS.attachmentsChanged, { missing: 0 })
+    broadcast(EVENTS.vaultReset, snapshot)
     return snapshot
   })
 
@@ -441,6 +461,65 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   // ───────────────────────── stats ─────────────────────────
+  // ───────────────────────── git sync / attachment package ─────────────────────────
+  register('sync:openWindow', async ({ tab }) => {
+    openSyncWindow(tab ?? 'git')
+  })
+
+  register('sync:status', async () => context.sync.status())
+
+  register('sync:configure', async (payload) => context.sync.configure(payload))
+
+  register('sync:test', async () => context.sync.test())
+
+  register('sync:push', async () => context.sync.push())
+
+  register('sync:pull', async () => {
+    // 先让主窗口把未保存的草稿 flush 到 vault，避免拉取后 loadSnapshot 覆盖草稿
+    const flushToken = randomUUID()
+    broadcast(EVENTS.flushRequest, { reason: 'switch', token: flushToken })
+    await context.waitForFlush(flushToken, 2000)
+    const result = await context.sync.pull()
+    const missing = (await context.sync.missingAttachments()).length
+    broadcast(EVENTS.attachmentsChanged, { missing })
+    broadcast(EVENTS.syncApplied, repository.getSnapshot())
+    return result
+  })
+
+  register('sync:missingAttachments', async () => context.sync.missingAttachments())
+
+  register('sync:openMigration', async ({ kind }, event) => {
+    const main = BrowserWindow.getAllWindows().find(
+      (window) => !window.isDestroyed() && window.webContents.id !== event.sender.id
+    )
+    if (!main) throw new AppError('NOT_FOUND', '找不到主窗口')
+    parentWindow(event)?.close()
+    main.show()
+    main.focus()
+    main.webContents.send(EVENTS.menuCommand, kind === 'export' ? 'migration-export' : 'migration-import')
+  })
+
+  register('attachment:exportPackage', async (_payload, event) => {
+    const result = await exportAttachmentPackage(
+      repository,
+      path.join(context.diaryDir, 'attachments'),
+      parentWindow(event)
+    )
+    if (result.path) await preferences.update({ lastExportDir: path.dirname(result.path) })
+    return result
+  })
+
+  register('attachment:importPackage', async (_payload, event) => {
+    const result = await importAttachmentPackage(
+      repository,
+      path.join(context.diaryDir, 'attachments'),
+      parentWindow(event)
+    )
+    const missing = (await context.sync.missingAttachments()).length
+    broadcast(EVENTS.attachmentsChanged, { missing })
+    return { ...result, missing }
+  })
+
   register('stats:storage', async (): Promise<StorageStats> => {
     const snapshot = repository.isUnlocked ? repository.getSnapshot() : null
     const scan = await scanOrphans(repository, attachments, { sniff: false })

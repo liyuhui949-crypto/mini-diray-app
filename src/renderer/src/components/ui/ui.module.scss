@@ -350,6 +350,11 @@
   color: #fff;
 }
 
+.toastSuccess {
+  background: var(--md-accent);
+  color: var(--md-accent-fg);
+}
+
 .toastAction {
   border: 0;
   background: transparent;

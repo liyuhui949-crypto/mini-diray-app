@@ -34,7 +34,7 @@ import { persistLayout, usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 
 import { CodeMirrorEditor, type EditorHandle } from './CodeMirrorEditor'
-import { MarkdownPreview } from './MarkdownPreview'
+import { MarkdownPreview, MissingAttachmentCard } from './MarkdownPreview'
 import { TagEditor } from './TagEditor'
 import { attachmentMarkdown } from './markdownCommands'
 import styles from './editor.module.scss'
@@ -140,6 +140,14 @@ export function EditorPane(): React.JSX.Element {
     [draft]
   )
   // 只有已经写进库的附件才能通过 attachment:// 读取，刚加入的等保存完成再显示缩略图
+  const missingAttachmentIds = useEntriesStore((state) => state.missingAttachmentIds)
+  const missingSet = useMemo(() => new Set(missingAttachmentIds), [missingAttachmentIds])
+  const missingAttachments = useMemo(
+    () => (draft?.attachments ?? []).filter((item) => missingSet.has(item.id)),
+    [draft?.attachments, missingSet]
+  )
+  const missingCount = missingAttachments.length
+
   const persistedIds = useMemo(() => {
     const saved = savedEntries.find((item) => item.date === activeDate)
     return new Set((saved?.attachments ?? []).map((item) => item.id))
@@ -473,6 +481,7 @@ export function EditorPane(): React.JSX.Element {
                     body={draft.body}
                     attachments={draft.attachments}
                     annotations={annotations}
+                    missingIds={missingSet}
                   />
                 </div>
               ) : (
@@ -513,14 +522,23 @@ export function EditorPane(): React.JSX.Element {
                   <div className={styles.attachHead}>
                     {copy.editor.attachmentCount(draft.attachments.length)}
                   </div>
+                  {!preview
+                    ? missingAttachments.map((attachment) => (
+                        <MissingAttachmentCard key={`missing-${attachment.id}`} attachment={attachment} />
+                      ))
+                    : null}
                   {draft.attachments.map((attachment) => (
                     <div key={attachment.id} className={styles.attachRow}>
                       <AttachmentGlyph
                         attachment={attachment}
                         persisted={persistedIds.has(attachment.id)}
+                        missing={missingSet.has(attachment.id)}
                       />
                       <span className={styles.attachName}>{attachment.name}</span>
                       <span className={styles.attachSize}>{formatBytes(attachment.size)}</span>
+                      {missingSet.has(attachment.id) ? (
+                        <span className={styles.attachMissing}>未迁移</span>
+                      ) : null}
                       <span className={styles.attachLock}>
                         <Lock size={10} /> {copy.attachments.encrypted}
                       </span>
@@ -627,7 +645,11 @@ export function EditorPane(): React.JSX.Element {
           <Lock size={12} /> AES-256-GCM
         </span>
         <span className={styles.sep} />
-        <span>{copy.editor.attachmentCount(draft.attachments.length)}</span>
+        <span>
+          {missingCount > 0
+            ? `${copy.editor.attachmentCount(draft.attachments.length)}（${missingCount} 个未迁移）`
+            : copy.editor.attachmentCount(draft.attachments.length)}
+        </span>
       </div>
 
       <Dialog
@@ -687,11 +709,16 @@ export function EditorPane(): React.JSX.Element {
 
 function AttachmentGlyph({
   attachment,
-  persisted
+  persisted,
+  missing
 }: {
   attachment: Attachment
   persisted: boolean
+  missing: boolean
 }): React.JSX.Element {
+  if (missing) {
+    return <span className={styles.glyphMissing}>☁</span>
+  }
   if (attachment.kind === 'image' && persisted) {
     return <img className={styles.glyph} src={`attachment://${attachment.id}`} alt="" />
   }

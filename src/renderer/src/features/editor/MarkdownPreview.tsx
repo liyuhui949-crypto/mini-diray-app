@@ -49,6 +49,8 @@ interface MarkdownPreviewProps {
   highlight?: string
   /** 批注：把引文包进 <mark class="ann-mark" data-ann-id>，点它可跳到卡片 */
   annotations?: readonly Annotation[]
+  /** 文本已同步、但本地没有 .mdat 的附件 id */
+  missingIds?: ReadonlySet<string>
 }
 
 /** hast 的最小结构，只为写一个不依赖额外包的高亮插件 */
@@ -150,7 +152,8 @@ export function MarkdownPreview({
   body,
   attachments,
   highlight,
-  annotations
+  annotations,
+  missingIds
 }: MarkdownPreviewProps): React.JSX.Element {
   const byId = new Map(attachments.map((attachment) => [attachment.id.toLowerCase(), attachment]))
   const rehypePlugins = useMemo(
@@ -176,12 +179,16 @@ export function MarkdownPreview({
             const id = typeof src === 'string' ? ATTACHMENT_SRC_RE.exec(src)?.[1]?.toLowerCase() : undefined
             const attachment = id ? byId.get(id) : undefined
             if (!attachment) return <span className={styles.missing}>{alt || '图片'}</span>
+            if (id && missingIds?.has(id)) return <MissingAttachmentCard attachment={attachment} />
             return <PreviewImage attachment={attachment} />
           },
           a: ({ href, children }) => {
             const id = typeof href === 'string' ? ATTACHMENT_SRC_RE.exec(href)?.[1]?.toLowerCase() : undefined
             const attachment = id ? byId.get(id) : undefined
-            if (attachment) return <AttachmentCard attachment={attachment} label={children} />
+            if (attachment) {
+              if (id && missingIds?.has(id)) return <MissingAttachmentCard attachment={attachment} />
+              return <AttachmentCard attachment={attachment} label={children} />
+            }
             if (href && /^https:/.test(href)) {
               return (
                 <a
@@ -201,6 +208,31 @@ export function MarkdownPreview({
       >
         {body}
       </ReactMarkdown>
+    </div>
+  )
+}
+
+export function MissingAttachmentCard({ attachment }: { attachment: Attachment }): React.JSX.Element {
+  return (
+    <div className={styles.missingCard}>
+      <span className={styles.missingIcon} aria-hidden="true">
+        ☁
+      </span>
+      <span className={styles.missingBody}>
+        <b>{attachment.name}</b>
+        <i>
+          附件尚未迁移 · {formatBytes(attachment.size)} · 这篇正文来自 Git 同步；在「数据 → 仅迁移附件」导入后自动补齐
+        </i>
+      </span>
+      <button
+        type="button"
+        className={styles.missingAction}
+        onClick={() => {
+          void call('sync:openWindow', { tab: 'data' })
+        }}
+      >
+        去迁移 →
+      </button>
     </div>
   )
 }

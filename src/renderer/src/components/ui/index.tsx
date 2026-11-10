@@ -249,7 +249,11 @@ export function ToastHost(): React.JSX.Element {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={[styles.toast, toast.tone === 'error' ? styles.toastError : '']
+          className={[
+            styles.toast,
+            toast.tone === 'error' ? styles.toastError : '',
+            toast.tone === 'success' ? styles.toastSuccess : ''
+          ]
             .filter(Boolean)
             .join(' ')}
         >

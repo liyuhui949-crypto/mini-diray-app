@@ -32,7 +32,7 @@ export interface ToastItem {
   id: string
   message: string
   action?: ToastAction
-  tone: 'default' | 'error'
+  tone: 'default' | 'error' | 'success'
 }
 
 let toastSeq = 0

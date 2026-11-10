@@ -21,6 +21,7 @@ import type {
   ThemeSource,
   VaultSnapshot
 } from './types'
+import type { SyncMissingAttachment, SyncStatus, SyncTab, SyncTestResult } from './sync'
 import type { ErrorPayload } from './errors'
 import {
   ANNOTATION_BODY_MAX_LENGTH,
@@ -45,7 +46,11 @@ export const EVENTS = {
   jobProgress: 'job:progress',
   jobDone: 'job:done',
   jobError: 'job:error',
-  openPackage: 'migration:open-package'
+  openPackage: 'migration:open-package',
+  syncTab: 'sync:tab',
+  attachmentsChanged: 'attachments:changed',
+  vaultReset: 'vault:reset',
+  syncApplied: 'sync:applied'
 } as const
 
 export type EventChannel = (typeof EVENTS)[keyof typeof EVENTS]
@@ -60,6 +65,10 @@ export interface EventPayloads {
   'job:done': JobDonePayload
   'job:error': JobErrorPayload
   'migration:open-package': { path: string }
+  'sync:tab': { tab: SyncTab }
+  'attachments:changed': { missing: number }
+  'vault:reset': VaultSnapshot
+  'sync:applied': VaultSnapshot
 }
 
 /** 统一 IPC 结果信封：失败也走 resolve，避免渲染进程拿到带堆栈的异常 */
@@ -152,6 +161,27 @@ export interface IpcContract {
   }
 
   'stats:storage': { req: void; res: StorageStats }
+
+  'sync:openWindow': { req: { tab?: SyncTab }; res: void }
+  'sync:status': { req: void; res: SyncStatus }
+  'sync:configure': {
+    req: { repo: string; branch?: string; proxy?: string | null; token?: string }
+    res: SyncStatus
+  }
+  'sync:test': { req: void; res: SyncTestResult }
+  'sync:push': { req: void; res: { commits: number; changed: number } }
+  'sync:pull': { req: void; res: { entries: number; annotations: number } }
+  'sync:missingAttachments': { req: void; res: SyncMissingAttachment[] }
+  'sync:openMigration': { req: { kind: 'export' | 'import' }; res: void }
+
+  'attachment:exportPackage': {
+    req: void
+    res: { path: string | null; count: number; bytes: number }
+  }
+  'attachment:importPackage': {
+    req: void
+    res: { imported: number; skipped: number; missing: number }
+  }
 }
 
 export type IpcChannel = keyof IpcContract

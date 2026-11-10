@@ -5,6 +5,7 @@ import {
   BarChart3,
   Box,
   ChevronRight,
+  Cloud,
   Loader2,
   Lock,
   PanelLeft,
@@ -312,6 +313,12 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
       </div>
 
       <div className={styles.sideFooter}>
+        <NavButton
+          active={false}
+          icon={<Cloud size={15} />}
+          label={copy.sync.title}
+          onClick={() => void call('sync:openWindow', { tab: 'git' })}
+        />
         <NavButton
           active={view === 'attachments'}
           icon={<Box size={15} />}

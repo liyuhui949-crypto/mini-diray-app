@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { copy } from '@shared/copy'
 import { todayLocalDate } from '@shared/date'
+import type { VaultSnapshot } from '@shared/types'
 
 import { call, errorMessage, subscribe } from '@/api/client'
 import { Dialogs } from '@/app/Dialogs'
@@ -56,6 +57,10 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     if (!booted) return
+    const applySnapshot = (snapshot: VaultSnapshot): void => {
+      useEntriesStore.getState().loadSnapshot(snapshot)
+      useVaultStore.getState().setSnapshot(snapshot)
+    }
     const disposers = [
       subscribe('vault:locked', ({ reason }) => {
         cancelPendingSave()
@@ -69,6 +74,11 @@ export default function App(): React.JSX.Element {
       subscribe('prefs:changed', (prefs) => {
         usePrefsStore.getState().setPrefs(prefs)
       }),
+      subscribe('attachments:changed', () => {
+        void useEntriesStore.getState().refreshMissingAttachments()
+      }),
+      subscribe('vault:reset', applySnapshot),
+      subscribe('sync:applied', applySnapshot),
       subscribe('theme:changed', ({ theme: next }) => {
         if (usePrefsStore.getState().prefs?.theme === 'system') {
           usePrefsStore.getState().setTheme(next === 'dark' ? 'dark' : 'light')

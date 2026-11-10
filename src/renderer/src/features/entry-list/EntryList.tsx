@@ -28,11 +28,13 @@ interface ListItem {
   snippets?: HighlightSegment[][]
   attachments: number
   annotations: number
+  missing: number
 }
 
 export function EntryList(): React.JSX.Element {
   const entries = useEntriesStore((state) => state.entries)
   const annotationsByDate = useEntriesStore((state) => state.annotations)
+  const missingIds = useEntriesStore((state) => state.missingAttachmentIds)
   const activeDate = useEntriesStore((state) => state.activeDate)
   const query = useEntriesStore((state) => state.searchQuery)
   const tag = useEntriesStore((state) => state.activeTag)
@@ -58,7 +60,11 @@ export function EntryList(): React.JSX.Element {
 
   const scopedEntries = listScope === 'month' ? monthEntries : entries
 
+  const missingSet = useMemo(() => new Set(missingIds), [missingIds])
+
   const items = useMemo<ListItem[]>(() => {
+    const countMissing = (entry: DiaryEntry): number =>
+      entry.attachments.reduce((sum, item) => sum + (missingSet.has(item.id) ? 1 : 0), 0)
     const toDesc = (list: readonly DiaryEntry[]): ListItem[] =>
       [...list]
         .sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -69,7 +75,8 @@ export function EntryList(): React.JSX.Element {
             : entry.title || copy.list.untitled,
           snippet: makeSnippet(entry.body, entry.title),
           attachments: entry.attachments.length,
-          annotations: annotationsByDate[entry.date]?.length ?? 0
+          annotations: annotationsByDate[entry.date]?.length ?? 0,
+          missing: countMissing(entry)
         }))
 
     // 搜索与标签是"全库"视图；只有普通列表跟随日历月份
@@ -83,12 +90,13 @@ export function EntryList(): React.JSX.Element {
         snippet: hit.snippets[0]?.text ?? '',
         snippets: hit.snippets.map((snippet) => snippet.segments),
         attachments: hit.entry.attachments.length,
-        annotations: annotationsByDate[hit.entry.date]?.length ?? 0
+        annotations: annotationsByDate[hit.entry.date]?.length ?? 0,
+        missing: countMissing(hit.entry)
       }))
     }
     if (tag) return toDesc(filterByTag(entries, tag))
     return toDesc(scopedEntries)
-  }, [entries, searching, query, tag, hideTitle, scopedEntries, annotationsByDate])
+  }, [entries, searching, query, tag, hideTitle, scopedEntries, annotationsByDate, missingSet])
 
   const totalWords = useMemo(
     () =>
@@ -185,6 +193,14 @@ export function EntryList(): React.JSX.Element {
                     <span className={styles.att}>
                       <Paperclip size={10} />
                       {item.attachments}
+                    </span>
+                  ) : null}
+                  {item.missing > 0 ? (
+                    <span
+                      className={styles.missBadge}
+                      title={`有 ${item.missing} 个附件尚未迁移 · 等待「仅迁移附件」导入`}
+                    >
+                      缺 {item.missing} 附件
                     </span>
                   ) : null}
                   {item.annotations > 0 ? (

@@ -61,8 +61,11 @@ interface EntriesState {
   searchInput: string
   /** 已提交、用于列表过滤与分析的检索词 */
   searchQuery: string
+  /** 本地不存在 .mdat 的附件 id（文本已同步、附件未迁移） */
+  missingAttachmentIds: string[]
   activeTag: string | null
   loadSnapshot: (snapshot: VaultSnapshot) => void
+  refreshMissingAttachments: () => Promise<void>
   clear: () => void
   openDate: (date: LocalDate) => Promise<void>
   updateDraft: (patch: Partial<Omit<EntryDraft, 'date'>>) => void
@@ -92,6 +95,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   saveError: null,
   searchInput: '',
   searchQuery: '',
+  missingAttachmentIds: [],
   activeTag: null,
 
   loadSnapshot: (snapshot) => {
@@ -105,6 +109,16 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       saveState: 'saved',
       saveError: null
     })
+    void get().refreshMissingAttachments()
+  },
+
+  refreshMissingAttachments: async () => {
+    try {
+      const missing = await call('sync:missingAttachments', undefined)
+      set({ missingAttachmentIds: missing.map((item) => item.id) })
+    } catch {
+      // 锁定时没有缺失列表；保持原状
+    }
   },
 
   clear: () =>
@@ -117,6 +131,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       saveError: null,
       searchInput: '',
       searchQuery: '',
+      missingAttachmentIds: [],
       activeTag: null
     }),
 
