@@ -77,8 +77,23 @@ export class SyncService {
     }
   }
 
+  private async withTokenKey<T>(fn: (key: Buffer, vaultId: string) => Promise<T>): Promise<T> {
+    if (!this.repository.isUnlocked) throw new AppError('VAULT_LOCKED')
+    const key = this.repository.getSyncTokenKey()
+    try {
+      return await fn(key, this.repository.getVaultId())
+    } finally {
+      key.fill(0)
+    }
+  }
+
+  private async readToken(): Promise<string | null> {
+    if (!this.repository.isUnlocked) return null
+    return this.withTokenKey((key, vaultId) => this.secrets.get(key, vaultId))
+  }
+
   private async tokenOrThrow(): Promise<string> {
-    const token = await this.secrets.get().catch(() => null)
+    const token = await this.readToken()
     if (!token) throw new AppError('GIT_AUTH_FAILED', '还没有保存 Git 访问令牌')
     return token
   }
@@ -117,7 +132,8 @@ export class SyncService {
       }
     }
 
-    const token = await this.secrets.get().catch(() => null)
+    const token = enabled ? await this.readToken() : null
+    const tokenSaved = enabled ? Boolean(token) : await this.secrets.has().catch(() => false)
     let ahead = 0
     let behind = 0
     let tracking = false
@@ -142,7 +158,7 @@ export class SyncService {
       repo,
       branch: prefs.syncBranch ?? 'main',
       proxy: normalizeProxy(prefs.syncProxy),
-      tokenSaved: Boolean(token),
+      tokenSaved,
       ahead,
       behind,
       tracking,
@@ -163,7 +179,10 @@ export class SyncService {
     if (input.token !== undefined && input.token.trim().length === 0) {
       throw new AppError('INVALID_INPUT', '访问令牌不能为空')
     }
-    if (input.token !== undefined) await this.secrets.set(input.token.trim())
+    const token = input.token
+    if (token !== undefined) {
+      await this.withTokenKey((key, vaultId) => this.secrets.set(token.trim(), key, vaultId))
+    }
     await this.preferences.update({
       syncRepo: repo,
       syncBranch: input.branch?.trim() || this.preferences.current.syncBranch || 'main',
@@ -178,6 +197,10 @@ export class SyncService {
     if (this.preferences.current.syncEnabled !== true) {
       throw new AppError('SYNC_DISABLED')
     }
+  }
+
+  async clearToken(): Promise<void> {
+    await this.secrets.clear()
   }
 
   async setEnabled(enabled: boolean): Promise<SyncStatus> {

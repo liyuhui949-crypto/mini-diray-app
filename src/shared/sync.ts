@@ -16,7 +16,7 @@ export interface SyncStatus {
   repo: string | null
   branch: string
   proxy: string | null
-  /** 钥匙串里是否已有 token */
+  /** 是否已保存可解密的 token */
   tokenSaved: boolean
   /** 本地领先远端的提交数 */
   ahead: number

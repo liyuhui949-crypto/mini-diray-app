@@ -15,7 +15,7 @@ const FAST = { N: 1024, r: 8, p: 1 }
 const PASSWORD = 'diary-password-1234'
 
 const fakeSecrets = {
-  available: async () => true,
+  has: async () => true,
   get: async () => 'fake-token',
   set: async () => undefined,
   clear: async () => undefined

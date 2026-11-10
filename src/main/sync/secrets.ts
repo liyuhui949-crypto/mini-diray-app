@@ -1,15 +1,31 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 
-import { AppError } from '@shared/errors'
-
+import { decryptGcm, encryptGcm } from '../vault/crypto'
 import { atomicWriteFile, pathExists, removePath } from '../vault/paths'
 
 const TOKEN_FILE = 'sync-token.bin'
+const TOKEN_FORMAT = 'minidiary-sync-token/1'
 
-/** Git 访问令牌只进系统钥匙串（safeStorage），不写偏好、不写日志。 */
+interface TokenFile {
+  format: string
+  vaultId: string
+  alg: 'AES-256-GCM'
+  iv: string
+  ciphertext: string
+  tag: string
+}
+
+function tokenAad(vaultId: string): string {
+  return `MINIDIARY|sync-token|1|${vaultId}`
+}
+
+/**
+ * Git token 用日记库 DEK 派生的密钥加密，不再使用系统钥匙串。
+ * 文件只能在解锁状态下读写；同步本来也要求解锁。
+ */
 export class SyncSecrets {
   private readonly file: string
 
@@ -17,26 +33,30 @@ export class SyncSecrets {
     this.file = file
   }
 
-  async available(): Promise<boolean> {
-    return safeStorage.isEncryptionAvailable()
+  /** 只判断文件是否存在，不要求解锁 */
+  async has(): Promise<boolean> {
+    return pathExists(this.file)
   }
 
-  async get(): Promise<string | null> {
+  async get(key: Buffer, vaultId: string): Promise<string | null> {
     if (!(await pathExists(this.file))) return null
     try {
-      const encrypted = await fs.readFile(this.file)
-      return safeStorage.decryptString(encrypted)
+      const parsed = JSON.parse(await fs.readFile(this.file, 'utf8')) as TokenFile
+      if (parsed.format !== TOKEN_FORMAT || parsed.vaultId !== vaultId) return null
+      return decryptGcm(key, parsed, tokenAad(vaultId)).toString('utf8')
     } catch {
       return null
     }
   }
 
-  async set(token: string): Promise<void> {
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new AppError('UNSUPPORTED', '系统钥匙串不可用，无法安全保存 Git 令牌')
+  async set(token: string, key: Buffer, vaultId: string): Promise<void> {
+    const block = encryptGcm(key, Buffer.from(token, 'utf8'), tokenAad(vaultId))
+    const payload: TokenFile = {
+      format: TOKEN_FORMAT,
+      vaultId,
+      ...block
     }
-    const encrypted = safeStorage.encryptString(token)
-    await atomicWriteFile(this.file, encrypted, 0o600)
+    await atomicWriteFile(this.file, JSON.stringify(payload), 0o600)
   }
 
   async clear(): Promise<void> {

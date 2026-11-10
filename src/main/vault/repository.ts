@@ -160,6 +160,12 @@ export class VaultRepository {
     return this.attachmentKey
   }
 
+  /** 同步令牌密钥：由 DEK 派生，锁定时不可用 */
+  getSyncTokenKey(): Buffer {
+    if (!this.dek) throw new AppError('VAULT_LOCKED')
+    return deriveSubkey(this.dek, this.envelope?.vaultId ?? '', 'sync-token-v1')
+  }
+
   /** Git 同步镜像的条目密钥；永不跨 IPC */
   getSyncKey(): Buffer {
     if (!this.dek) throw new AppError('VAULT_LOCKED')
