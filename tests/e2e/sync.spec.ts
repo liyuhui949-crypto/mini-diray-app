@@ -21,7 +21,7 @@ test.afterAll(async () => {
   await rm(homeDir, { recursive: true, force: true })
 })
 
-test('同步窗口、两页签与缺失附件状态', async () => {
+test('同步面板、两页签与缺失附件状态', async () => {
   const launched = await launchApp(homeDir)
   app = launched.app
   page = launched.page
@@ -65,21 +65,39 @@ test('同步窗口、两页签与缺失附件状态', async () => {
   await expect(page.getByText('（1 个未迁移）')).toBeVisible()
 
   await page.getByRole('button', { name: '同步', exact: true }).click()
-  await expect.poll(() => app.windows().filter((item) => item.url().includes('window=sync')).length).toBe(1)
-  const sync = app.windows().find((item) => item.url().includes('window=sync'))
-  if (!sync) throw new Error('没有打开同步窗口')
-  await sync.waitForLoadState('domcontentloaded')
-  await expect(sync.getByRole('tab', { name: 'Git 同步' })).toBeVisible()
-  await expect(sync.getByText('尚未连接仓库').first()).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Git 同步' })).toBeVisible()
+  await expect(page.getByText('同步默认是关闭的，需要手动打开。')).toBeVisible()
+  await expect(page.getByText('每次推送都会留下一个版本。')).toBeVisible()
+  const syncSwitch = page.getByRole('switch')
+  await expect(syncSwitch).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByText('同步已关闭').first()).toBeVisible()
+  await expect(page.getByText('Git 密钥')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '测试连接' })).toHaveCount(0)
 
-  await sync.getByRole('tab', { name: '数据' }).click()
-  await expect(sync.getByText('1 个附件未迁移')).toBeVisible()
-  await expect(sync.getByText('仅迁移附件')).toBeVisible()
+  await syncSwitch.click()
+  await expect(syncSwitch).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByText('尚未连接仓库').first()).toBeVisible()
+  await expect(page.getByText('Git 密钥')).toBeVisible()
+  await syncSwitch.click()
+  await expect(syncSwitch).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByText('Git 密钥')).toHaveCount(0)
 
-  await sync.getByRole('button', { name: '清空…' }).click()
-  await expect(sync.getByPlaceholder('日记库密码')).toBeVisible()
-  await expect(sync.getByPlaceholder('DELETE')).toBeVisible()
-  await sync.keyboard.press('Escape')
+  await page.getByRole('tab', { name: '数据' }).click()
+  await expect(page.getByText('1 个附件未迁移')).toBeVisible()
+  await expect(page.getByText('仅迁移附件')).toBeVisible()
+
+  await page.getByRole('button', { name: '导出…' }).nth(1).click()
+  await expect(page.locator('#att-export-password')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: '导入…' }).nth(1).click()
+  await expect(page.locator('#att-import-key')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: '清空…' }).click()
+  await expect(page.getByPlaceholder('日记库密码')).toBeVisible()
+  await expect(page.getByPlaceholder('DELETE')).toBeVisible()
+  await page.keyboard.press('Escape')
 
   expect(errors).toEqual([])
 })

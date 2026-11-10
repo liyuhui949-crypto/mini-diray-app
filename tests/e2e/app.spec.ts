@@ -117,6 +117,10 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   await page.getByRole('button', { name: '锁定' }).click()
   await expect(page.getByText('已锁定')).toBeVisible()
   await expect(page.getByText('雨停之后')).toHaveCount(0)
+  const compact = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.getBounds()
+  )
+  expect(compact?.width).toBeLessThan(700)
 
   const lockedStatus = await app.evaluate(async ({ net }, id) => {
     const response = await net.fetch(`attachment://${id}`)
@@ -129,6 +133,10 @@ test('建库、写作、附件解密、搜索、锁定与重启保持', async ()
   await expect(page.getByText('密码错误或文件已损坏')).toBeVisible({ timeout: 15_000 })
   await unlockVault(page, PASSWORD)
   await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
+  const restored = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.getBounds()
+  )
+  expect(restored?.width).toBeGreaterThan(900)
 
   // 7. 重启后仍在
   await app.close()

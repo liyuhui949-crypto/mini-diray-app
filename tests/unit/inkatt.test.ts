@@ -14,12 +14,15 @@ vi.mock('electron', () => ({
   }
 }))
 
+import { generatePackageKey, normalizePackageKey } from '../../src/shared/packageKey'
 import { AttachmentStore } from '../../src/main/attachments/store'
 import { exportAttachmentPackage, importAttachmentPackage } from '../../src/main/sync/attachmentPackage'
 import { VaultRepository } from '../../src/main/vault/repository'
 
 const FAST = { N: 1024, r: 8, p: 1 }
 const PASSWORD = 'diary-password-1234'
+const PACKAGE_PASSWORD = 'package-password-1234'
+const PACKAGE_KEY = normalizePackageKey(generatePackageKey())
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64'
@@ -55,20 +58,26 @@ describe('.inkatt attachment package', () => {
       })
 
       target = pkg
-      const exported = await exportAttachmentPackage(repo, path.join(dir, 'attachments'), null)
+      const exported = await exportAttachmentPackage(repo, path.join(dir, 'attachments'), null, { packageKey: PACKAGE_KEY, packagePassword: PACKAGE_PASSWORD })
       expect(exported.count).toBe(1)
       expect((await stat(pkg)).size).toBeGreaterThan(0)
 
       const local = path.join(dir, 'attachments', `${attachment.id}.mdat`)
       await unlink(local)
       target = pkg
-      const imported = await importAttachmentPackage(repo, path.join(dir, 'attachments'), null)
+      await expect(
+        importAttachmentPackage(repo, path.join(dir, 'attachments'), null, {
+          packageKey: normalizePackageKey(generatePackageKey()),
+          packagePassword: PACKAGE_PASSWORD
+        })
+      ).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
+      const imported = await importAttachmentPackage(repo, path.join(dir, 'attachments'), null, { packageKey: PACKAGE_KEY, packagePassword: PACKAGE_PASSWORD })
       expect(imported.imported).toBe(1)
       expect((await stat(local)).size).toBeGreaterThan(64)
 
       // 再导入一次：已存在且哈希一致，跳过
       target = pkg
-      const again = await importAttachmentPackage(repo, path.join(dir, 'attachments'), null)
+      const again = await importAttachmentPackage(repo, path.join(dir, 'attachments'), null, { packageKey: PACKAGE_KEY, packagePassword: PACKAGE_PASSWORD })
       expect(again.imported).toBe(0)
       expect(again.skipped).toBe(1)
     } finally {

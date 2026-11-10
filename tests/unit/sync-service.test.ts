@@ -59,6 +59,8 @@ describe('SyncService', () => {
         secrets: fakeSecrets as never
       })
       await source.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await expect(source.push()).rejects.toMatchObject({ code: 'SYNC_DISABLED' })
+      await source.setEnabled(true)
       const pushed = await source.push()
       expect(pushed.commits).toBe(1)
 
@@ -76,6 +78,7 @@ describe('SyncService', () => {
         secrets: fakeSecrets as never
       })
       await target.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await target.setEnabled(true)
       const pulled = await target.pull()
       expect(pulled.entries).toBe(0) // 目标库已有 11-08，无新增
       expect(targetRepo.getSnapshot().entries.map((entry) => entry.date).sort()).toEqual([
