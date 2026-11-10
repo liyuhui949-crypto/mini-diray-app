@@ -99,5 +99,12 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByPlaceholder('DELETE')).toBeVisible()
   await page.keyboard.press('Escape')
 
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await expect(page.getByText('需要的权限')).toBeVisible()
+  await expect(page.getByText('文稿文件夹')).toBeVisible()
+  await expect(page.getByText('本地网络', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '打开文稿设置' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '打开本地网络设置' })).toBeVisible()
+
   expect(errors).toEqual([])
 })

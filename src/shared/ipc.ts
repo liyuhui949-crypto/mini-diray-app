@@ -77,6 +77,7 @@ export interface IpcContract {
   'app:flushAck': { req: { token: string }; res: void }
   'app:openDiaryDir': { req: void; res: void }
   'shell:openExternal': { req: { url: string }; res: void }
+  'system:openPrivacySettings': { req: { target: 'localNetwork' | 'filesAndFolders' }; res: void }
   'app:copyText': { req: { text: string }; res: void }
 
   'vault:create': { req: { password: string }; res: VaultSnapshot }

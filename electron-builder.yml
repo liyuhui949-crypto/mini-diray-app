@@ -48,6 +48,8 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSHumanReadableCopyright: Copyright © 2026 Mini Diary
+    NSDocumentsFolderUsageDescription: Mini Diary 需要在你选择的文件夹里读写加密日记和附件。
+    NSLocalNetworkUsageDescription: 连接本地 Git 代理或局域网 Git 仓库时，需要访问本地网络。
 
 dmg:
   contents:

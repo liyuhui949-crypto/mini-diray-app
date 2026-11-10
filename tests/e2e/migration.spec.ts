@@ -61,8 +61,9 @@ test('导出迁移包再导入到全新安装', async () => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: target })
     }, packagePath)
 
-    await page.getByRole('button', { name: '设置' }).click()
-    await page.getByRole('button', { name: '导出…' }).click()
+    await page.getByRole('button', { name: '同步', exact: true }).click()
+    await page.getByRole('tab', { name: '数据' }).click()
+    await page.getByRole('button', { name: '导出…' }).first().click()
     await fillInput(page.locator('#export-password'), PACKAGE_PASSWORD)
     await page.getByRole('button', { name: '生成公钥' }).click()
     await expect(page.locator('#package-key')).toBeVisible()

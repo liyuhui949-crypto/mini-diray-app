@@ -143,6 +143,17 @@ export function registerIpcHandlers(context: AppContext): void {
     await shell.openExternal(url)
   })
 
+  register('system:openPrivacySettings', async ({ target }) => {
+    if (process.platform !== 'darwin') {
+      throw new AppError('UNSUPPORTED', '当前系统没有这个隐私权限设置')
+    }
+    const pane =
+      target === 'localNetwork' ? 'Privacy_LocalNetwork' : 'Privacy_FilesAndFolders'
+    await shell.openExternal(
+      `x-apple.systempreferences:com.apple.preference.security?${pane}`
+    )
+  })
+
   // ───────────────────────── vault ─────────────────────────
   register('vault:create', async ({ password }) => {
     const snapshot = await repository.create(password)
@@ -170,6 +181,7 @@ export function registerIpcHandlers(context: AppContext): void {
   register('vault:moveDirectory', async ({ targetDir }) => {
     if (!path.isAbsolute(targetDir)) throw new AppError('INVALID_INPUT', '目录必须是绝对路径')
     const result = await repository.moveDirectory(targetDir)
+    await context.sync.clearToken().catch(() => undefined)
     await preferences.update({
       diaryDir: result.diaryDir,
       syncRepo: null,
@@ -184,8 +196,9 @@ export function registerIpcHandlers(context: AppContext): void {
   register('vault:reset', async ({ password }) => {
     const snapshot = await repository.reset(password)
     await attachments.cleanupParts()
-    // 清空数据后本地同步镜像没有意义；远端仓库保持不动，重新配置即可再同步
+    // 清空数据后本地同步镜像和令牌没有意义；远端仓库保持不动
     await removePath(syncRoot(context.diaryDir)).catch(() => undefined)
+    await context.sync.clearToken().catch(() => undefined)
     await preferences.update({
       syncRepo: null,
       syncLastAt: null,

@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 import { copy } from '@shared/copy'
 import type { AutoLockMinutes } from '@shared/types'
 
@@ -24,36 +22,20 @@ const AUTO_LOCK_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '60', label: copy.preferences.autoLockMinutes(60) }
 ]
 
-function abbreviateHome(target: string): string {
-  const home = '/Users/'
-  if (!target.startsWith(home)) return target
-  const parts = target.split('/')
-  return `~/${parts.slice(3).join('/')}`
-}
-
 export function PreferencesPane(): React.JSX.Element {
   const appVersion = usePrefsStore((state) => state.appVersion)
   const prefs = usePrefsStore((state) => state.prefs)
   const update = usePrefsStore((state) => state.update)
   const openDialog = useUiStore((state) => state.openDialog)
   const pushToast = useUiStore((state) => state.pushToast)
-  const [moving, setMoving] = useState(false)
+  const isMac = window.miniDiary.platform === 'darwin'
 
   if (!prefs) return <div className={styles.pane} />
 
-  const moveDirectory = async (): Promise<void> => {
-    setMoving(true)
-    try {
-      const picked = await call('dialog:pickDirectory', { purpose: copy.preferences.moveDirTitle })
-      if (!picked.path) return
-      const result = await call('vault:moveDirectory', { targetDir: picked.path })
-      usePrefsStore.getState().setPrefs({ ...prefs, diaryDir: result.diaryDir })
-      pushToast(copy.preferences.moveDirTitle)
-    } catch (error) {
+  const openPrivacySettings = (target: 'filesAndFolders' | 'localNetwork'): void => {
+    void call('system:openPrivacySettings', { target }).catch((error) => {
       pushToast(errorMessage(error), { tone: 'error' })
-    } finally {
-      setMoving(false)
-    }
+    })
   }
 
   return (
@@ -122,45 +104,24 @@ export function PreferencesPane(): React.JSX.Element {
         </Setting>
       </section>
 
-      <section className={styles.panel}>
-        <h3>{copy.preferences.data}</h3>
-        <Setting title={copy.preferences.diaryDir} description={copy.preferences.diaryDirDesc}>
-          <div className={styles.rowActions}>
-            <code className={styles.path} title={prefs.diaryDir}>
-              {abbreviateHome(prefs.diaryDir)}
-            </code>
-            <Button
-              size="sm"
-              onClick={() => {
-                void call('app:openDiaryDir', undefined)
-              }}
-            >
-              {copy.preferences.openDir}
+      {isMac ? (
+        <section className={styles.panel}>
+          <h3>{copy.preferences.permissions}</h3>
+          <Setting title={copy.preferences.permissionFiles} description={copy.preferences.permissionFilesDesc}>
+            <Button size="sm" onClick={() => openPrivacySettings('filesAndFolders')}>
+              {copy.preferences.permissionOpenFiles}
             </Button>
-            <Button size="sm" disabled={moving} onClick={() => void moveDirectory()}>
-              {copy.preferences.moveDir}
+          </Setting>
+          <Setting
+            title={copy.preferences.permissionLocalNetwork}
+            description={copy.preferences.permissionLocalNetworkDesc}
+          >
+            <Button size="sm" onClick={() => openPrivacySettings('localNetwork')}>
+              {copy.preferences.permissionOpenLocalNetwork}
             </Button>
-          </div>
-        </Setting>
-        <Setting title={copy.preferences.migration} description={copy.preferences.migrationDesc}>
-          <div className={styles.rowActions}>
-            <Button size="sm" onClick={() => openDialog('migrationImport')}>
-              {copy.preferences.migrationImport}
-            </Button>
-            <Button size="sm" variant="primary" onClick={() => openDialog('migrationExport')}>
-              {copy.preferences.migrationExport}
-            </Button>
-          </div>
-        </Setting>
-      </section>
-
-      <section className={styles.dangerBox}>
-        <Setting title={copy.preferences.resetDiary} description={copy.preferences.resetDiaryDesc}>
-          <Button size="sm" variant="danger" onClick={() => openDialog('resetVault')}>
-            {copy.preferences.resetAction}
-          </Button>
-        </Setting>
-      </section>
+          </Setting>
+        </section>
+      ) : null}
 
       <section className={styles.panel}>
         <h3>{copy.preferences.about}</h3>
@@ -183,7 +144,7 @@ function Setting({
 }: {
   title: string
   description?: string
-  children: React.ReactNode
+  children?: React.ReactNode
 }): React.JSX.Element {
   return (
     <div className={styles.setting}>
@@ -191,7 +152,7 @@ function Setting({
         <div className={styles.settingTitle}>{title}</div>
         {description ? <div className={styles.settingDesc}>{description}</div> : null}
       </div>
-      <div className={styles.settingControl}>{children}</div>
+      {children ? <div className={styles.settingControl}>{children}</div> : null}
     </div>
   )
 }
