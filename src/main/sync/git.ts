@@ -5,7 +5,7 @@ import path from 'node:path'
 
 import { AppError } from '@shared/errors'
 
-export interface GitInfo {
+interface GitInfo {
   path: string
   version: string
 }
@@ -17,7 +17,7 @@ export interface GitRunOptions {
   timeoutMs?: number
 }
 
-export interface GitOutput {
+interface GitOutput {
   stdout: string
   stderr: string
 }
@@ -304,6 +304,24 @@ export async function pullFastForward(
   branch: string
 ): Promise<void> {
   await runGit(['merge', '--ff-only', `origin/${branch}`], { ...options, timeoutMs: 120_000 })
+}
+
+/** ref 是否是 HEAD 的祖先（用于判断谁落后/分叉） */
+export async function isAncestor(
+  ancestor: string,
+  descendant: string,
+  options: GitRunOptions
+): Promise<boolean> {
+  try {
+    await runGit(['merge-base', '--is-ancestor', ancestor, descendant], options)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function resetHard(options: GitRunOptions, ref: string): Promise<void> {
+  await runGit(['reset', '--hard', ref], options)
 }
 
 export async function lsRemote(options: GitRunOptions): Promise<string> {

@@ -14,12 +14,15 @@ import {
   fetchOrigin,
   findGit,
   initRepo,
+  isAncestor,
   isGitRepo,
   lsRemote,
   pullFastForward,
+  resetHard,
   push as pushGit,
   runGit,
-  statusPorcelain
+  statusPorcelain,
+  type GitRunOptions
 } from './git'
 import { buildMirror, readMirror, syncRoot } from './mirror'
 import { SyncSecrets } from './secrets'
@@ -244,13 +247,17 @@ export class SyncService {
     await this.prepareRepo()
   }
 
-  private async hasHead(cwd: string): Promise<boolean> {
+  private async hasRef(ref: string, options: GitRunOptions): Promise<boolean> {
     try {
-      await runGit(['rev-parse', '--verify', 'HEAD'], { cwd })
+      await runGit(['rev-parse', '--verify', ref], options)
       return true
     } catch {
       return false
     }
+  }
+
+  private async hasHead(cwd: string): Promise<boolean> {
+    return this.hasRef('HEAD', { cwd })
   }
 
   async push(): Promise<{ commits: number; changed: number }> {
@@ -267,7 +274,13 @@ export class SyncService {
           options,
           `sync: ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`
         )
-        await pushGit(options, prefs.syncBranch ?? 'main')
+        const branch = prefs.syncBranch ?? 'main'
+        await fetchOrigin(options)
+        const remoteRef = `refs/remotes/origin/${branch}`
+        if ((await this.hasRef(remoteRef, options)) && !(await isAncestor(remoteRef, 'HEAD', options))) {
+          throw new AppError('SYNC_CONFLICT')
+        }
+        await pushGit(options, branch)
         await this.rememberResult(true, null)
         return { commits: result.committed ? 1 : 0, changed }
       } catch (error) {
@@ -291,20 +304,30 @@ export class SyncService {
         const hasHead = await this.hasHead(cwd)
         if (hasHead) {
           await buildMirror(this.repository, todayLocalDate())
-          if ((await statusPorcelain(options)).trim()) {
-            throw new AppError('SYNC_CONFLICT', '本地有未推送改动，请先推送')
-          }
+          // 本地镜像只是日记库的派生缓存：先提交成临时快照，分叉时才能安全让位给远端
+          await commitAll(options, 'sync: 拉取前本地快照')
           await fetchOrigin(options)
-          await pullFastForward(options, branch)
+          const remoteRef = `refs/remotes/origin/${branch}`
+          if (await this.hasRef(remoteRef, options)) {
+            const localAhead = await isAncestor(remoteRef, 'HEAD', options)
+            const localBehind = await isAncestor('HEAD', remoteRef, options)
+            if (!localAhead) {
+              if (localBehind) {
+                await pullFastForward(options, branch)
+              } else {
+                // 两边各有提交：本地镜像可以丢弃，日记正文仍在 vault 里
+                await resetHard(options, remoteRef)
+              }
+            }
+          }
         } else {
           // 新接入：本地还没有任何提交，先取远端；远端为空时保持空仓库。
           // fetch 失败（代理/认证）必须抛出，不能当成“空仓库”静默成功。
           await fetchOrigin(options)
           const remoteRef = `refs/remotes/origin/${branch}`
-          const hasRemoteBranch = await runGit(['rev-parse', '--verify', remoteRef], options)
-            .then(() => true)
-            .catch(() => false)
-          if (hasRemoteBranch) await checkoutRemoteBranch(options, branch)
+          if (await this.hasRef(remoteRef, options)) {
+            await checkoutRemoteBranch(options, branch)
+          }
         }
         const mirror = await readMirror(this.repository, todayLocalDate())
         const applied = await this.repository.applySync(mirror, todayLocalDate())

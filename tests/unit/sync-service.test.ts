@@ -98,4 +98,67 @@ describe('SyncService', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('远端分叉时先拉取可恢复，本地未推送条目仍保留', async () => {
+    process.env['MINIDIARY_ALLOW_LOCAL_REMOTE'] = '1'
+    const root = await tempDir()
+    const remote = path.join(root, 'remote.git')
+    const sourceDir = path.join(root, 'source')
+    const targetDir = path.join(root, 'target')
+    try {
+      await exec('git', ['init', '--bare', remote])
+      const sourcePrefs = new PreferencesStore({
+        file: path.join(root, 'source-prefs.json'),
+        defaultDiaryDir: sourceDir
+      })
+      const sourceRepo = new VaultRepository({ dir: sourceDir, scrypt: FAST })
+      await sourceRepo.create(PASSWORD)
+      await sourceRepo.saveEntry(draft('2026-11-08', '原始', '原始正文'))
+      const source = new SyncService({
+        repository: sourceRepo,
+        preferences: sourcePrefs,
+        secrets: fakeSecrets as never
+      })
+      await source.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await source.setEnabled(true)
+      await source.push()
+
+      // 两台设备从同一个提交出发，各自再提交一次
+      await cp(sourceDir, targetDir, { recursive: true })
+      const targetPrefs = new PreferencesStore({
+        file: path.join(root, 'target-prefs.json'),
+        defaultDiaryDir: targetDir
+      })
+      const targetRepo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      await targetRepo.unlock(PASSWORD)
+      await targetRepo.saveEntry(draft('2026-11-08', '目标改过', '目标改过的正文'))
+      const target = new SyncService({
+        repository: targetRepo,
+        preferences: targetPrefs,
+        secrets: fakeSecrets as never
+      })
+      await target.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await target.setEnabled(true)
+      await target.push()
+
+      await sourceRepo.saveEntry(draft('2026-11-09', '来源新增', '来源新增正文'))
+      await expect(source.push()).rejects.toMatchObject({ code: 'SYNC_CONFLICT' })
+      expect(sourceRepo.getSnapshot().entries.map((entry) => entry.date)).toContain('2026-11-09')
+
+      // 拉取丢弃镜像里的本地分叉，但 vault 里的 11-09 还在；再推送会合并两边
+      await source.pull()
+      expect(sourceRepo.getSnapshot().entries.map((entry) => entry.date).sort()).toEqual([
+        '2026-11-08',
+        '2026-11-09'
+      ])
+      await source.push()
+      await target.pull()
+      expect(targetRepo.getSnapshot().entries.map((entry) => entry.date).sort()).toEqual([
+        '2026-11-08',
+        '2026-11-09'
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

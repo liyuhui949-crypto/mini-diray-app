@@ -55,7 +55,7 @@ const defaultMessages: Record<ErrorCode, string> = {
   GIT_DNS: '无法解析仓库域名，请检查网络或 DNS',
   SYNC_NOT_CONFIGURED: '还没有配置 Git 同步仓库',
   SYNC_DISABLED: 'Git 同步已关闭；开启后才会运行 git 或联网',
-  SYNC_CONFLICT: '远端与本地已分叉，请先推送或手动处理',
+  SYNC_CONFLICT: '远端有新的同步内容，请先点「拉取」，再点「推送」',
   SYNC_BUSY: '另一个同步任务正在进行，请稍候',
   SYNC_VAULT_MISMATCH: '这个仓库属于另一个日记库，不能直接同步',
   SYNC_MIRROR_CORRUPT: '同步镜像已损坏，请重新拉取或重建镜像',
