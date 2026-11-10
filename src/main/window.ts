@@ -10,6 +10,7 @@ import { logger } from './logger'
 const trusted = new Set<number>()
 
 const COMPACT_BOUNDS = { width: 480, height: 600, minWidth: 400, minHeight: 480 }
+const ONBOARDING_BOUNDS = { width: 480, height: 720, minWidth: 400, minHeight: 600 }
 let mainWindow: BrowserWindow | null = null
 let expandedBounds: Electron.Rectangle | null = null
 let expandedMaximized = false
@@ -18,12 +19,8 @@ export function isTrustedWebContents(webContents: WebContents): boolean {
   return trusted.has(webContents.id)
 }
 
-export function forgetWebContents(webContents: WebContents): void {
-  trusted.delete(webContents.id)
-}
-
-/** 给额外窗口（同步窗口）注册 trusted，避免 IPC sender 校验拒绝 */
-export function registerTrustedWindow(window: BrowserWindow): void {
+/** 主窗口注册 trusted，避免 IPC sender 校验拒绝 */
+function registerTrustedWindow(window: BrowserWindow): void {
   const id = window.webContents.id
   trusted.add(id)
   window.on('closed', () => trusted.delete(id))
@@ -44,8 +41,20 @@ function allowedOrigin(): string | null {
 }
 
 /** 自动化测试用：窗口不在屏幕上出现，也不抢焦点 */
-export function isSilent(): boolean {
+function isSilent(): boolean {
   return process.env['MINIDIARY_SILENT'] === '1'
+}
+
+function compactTo(
+  window: BrowserWindow,
+  bounds: { width: number; height: number; minWidth: number; minHeight: number }
+): void {
+  if (!window.isFullScreen()) expandedBounds = window.getNormalBounds()
+  expandedMaximized = window.isMaximized()
+  if (window.isMaximized()) window.unmaximize()
+  window.setMinimumSize(bounds.minWidth, bounds.minHeight)
+  window.setSize(bounds.width, bounds.height)
+  window.center()
 }
 
 /** 锁定后只保留密码框需要的空间；解锁时恢复原来的窗口尺寸 */
@@ -53,26 +62,24 @@ export function setMainWindowLocked(locked: boolean): void {
   const window = mainWindow
   if (!window || window.isDestroyed()) return
   if (locked) {
-    if (!window.isFullScreen()) expandedBounds = window.getNormalBounds()
-    expandedMaximized = window.isMaximized()
-    if (window.isMaximized()) window.unmaximize()
-    window.setMinimumSize(COMPACT_BOUNDS.minWidth, COMPACT_BOUNDS.minHeight)
-    window.setSize(COMPACT_BOUNDS.width, COMPACT_BOUNDS.height)
-    window.center()
+    compactTo(window, COMPACT_BOUNDS)
     return
   }
   window.setMinimumSize(960, 620)
-  if (expandedBounds) {
-    window.setBounds(expandedBounds)
-    expandedBounds = null
-  } else {
-    window.setSize(1440, 920)
-    window.center()
-  }
+  if (!expandedBounds) return
+  window.setBounds(expandedBounds)
+  expandedBounds = null
   if (expandedMaximized) {
     expandedMaximized = false
     window.maximize()
   }
+}
+
+/** 首次安装/恢复出厂：和锁定态一样窄，只够放建库表单 */
+export function setMainWindowOnboarding(): void {
+  const window = mainWindow
+  if (!window || window.isDestroyed()) return
+  compactTo(window, ONBOARDING_BOUNDS)
 }
 
 export function createMainWindow(preferences: Preferences): BrowserWindow {

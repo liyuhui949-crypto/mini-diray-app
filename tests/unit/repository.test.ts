@@ -148,7 +148,7 @@ describe('VaultRepository', () => {
     }
   })
 
-  it('重置清空条目与附件，但保留密码', async () => {
+  it('销毁后删除日记库与附件，旧密码不再可用', async () => {
     const dir = await tempDir()
     try {
       const repo = new VaultRepository({ dir, scrypt: FAST })
@@ -158,13 +158,12 @@ describe('VaultRepository', () => {
       await mkdir(attachmentDir, { recursive: true })
       await writeFile(path.join(attachmentDir, 'orphan.mdat'), 'x')
 
-      const snapshot = await repo.reset(PASSWORD)
-      expect(snapshot.entries).toHaveLength(0)
-      expect(await stat(path.join(dir, 'attachments'))).toBeTruthy()
-      expect(await readFile(path.join(dir, 'diary.vault'), 'utf8')).not.toContain('标题')
-
-      repo.lock()
-      await repo.unlock(PASSWORD)
+      await expect(repo.destroy('wrong-password')).rejects.toMatchObject({ code: 'WRONG_PASSWORD' })
+      await repo.destroy(PASSWORD)
+      expect(repo.isUnlocked).toBe(false)
+      await expect(stat(path.join(dir, 'diary.vault'))).rejects.toBeTruthy()
+      await expect(stat(attachmentDir)).rejects.toBeTruthy()
+      await expect(repo.unlock(PASSWORD)).rejects.toBeTruthy()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

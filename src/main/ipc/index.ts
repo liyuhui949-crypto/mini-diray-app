@@ -38,7 +38,7 @@ import { defaultPackageFileName } from '../migration/package'
 import { exportAttachmentPackage, importAttachmentPackage } from '../sync/attachmentPackage'
 import { syncRoot } from '../sync/mirror'
 import { ensureVaultDirs, removePath, vaultPaths } from '../vault/paths'
-import { isTrustedWebContents, setMainWindowLocked } from '../window'
+import { isTrustedWebContents, setMainWindowLocked, setMainWindowOnboarding } from '../window'
 
 function resolveTheme(context: AppContext): ThemeSource {
   const { theme } = context.preferences.current
@@ -194,20 +194,16 @@ export function registerIpcHandlers(context: AppContext): void {
   })
 
   register('vault:reset', async ({ password }) => {
-    const snapshot = await repository.reset(password)
-    await attachments.cleanupParts()
-    // 清空数据后本地同步镜像和令牌没有意义；远端仓库保持不动
-    await removePath(syncRoot(context.diaryDir)).catch(() => undefined)
+    const oldDir = context.diaryDir
+    await repository.destroy(password)
+    await removePath(syncRoot(oldDir)).catch(() => undefined)
     await context.sync.clearToken().catch(() => undefined)
-    await preferences.update({
-      syncRepo: null,
-      syncLastAt: null,
-      syncLastResult: null,
-      syncLastMessage: null
-    })
+    const prefs = await preferences.reset()
+    context.applyDiaryDir(prefs.diaryDir)
+    setMainWindowOnboarding()
+    broadcast(EVENTS.prefsChanged, prefs)
     broadcast(EVENTS.attachmentsChanged, { missing: 0 })
-    broadcast(EVENTS.vaultReset, snapshot)
-    return snapshot
+    broadcast(EVENTS.vaultReset, { status: 'missing' })
   })
 
   // ───────────────────────── entries ─────────────────────────
@@ -393,6 +389,7 @@ export function registerIpcHandlers(context: AppContext): void {
     const job = jobs.create('migration-import')
     try {
       const result = await context.migrationImport.run({ token, mode, job })
+      setMainWindowLocked(false)
       if (result.prefs) {
         const next = await preferences.update({
           theme: result.prefs.theme,

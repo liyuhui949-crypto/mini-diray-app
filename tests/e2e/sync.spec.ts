@@ -65,7 +65,9 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByText('（1 个未迁移）')).toBeVisible()
 
   await page.getByRole('button', { name: '同步', exact: true }).click()
+  await expect(page.getByRole('tab', { name: '数据' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('tab', { name: 'Git 同步' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Git 同步' }).click()
   await expect(page.getByText('同步默认是关闭的，需要手动打开。')).toBeVisible()
   await expect(page.getByText('每次推送都会留下一个版本。')).toBeVisible()
   const syncSwitch = page.getByRole('switch')
@@ -96,7 +98,7 @@ test('同步面板、两页签与缺失附件状态', async () => {
 
   await page.getByRole('button', { name: '清空…' }).click()
   await expect(page.getByPlaceholder('日记库密码')).toBeVisible()
-  await expect(page.getByPlaceholder('DELETE')).toBeVisible()
+  await expect(page.getByPlaceholder('我确定清空全部数据')).toBeVisible()
   await page.keyboard.press('Escape')
 
   await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -105,6 +107,28 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByText('本地网络', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: '打开文稿设置' })).toBeVisible()
   await expect(page.getByRole('button', { name: '打开本地网络设置' })).toBeVisible()
+
+  // 清空全部数据：应删除日记库、密码和配置，回到首次安装的引导页
+  await page.getByRole('button', { name: '同步', exact: true }).click()
+  await page.getByRole('tab', { name: '数据' }).click()
+  await page.getByRole('button', { name: '清空…' }).click()
+  await page.locator('#reset-password').fill(PASSWORD)
+  await page.locator('#reset-delete').fill('我确定清空全部数据')
+  await page.getByRole('button', { name: '我确定清空全部数据' }).click()
+  await expect(page.locator('#new-password')).toBeVisible({ timeout: 20_000 })
+
+  const bootstrap = await page.evaluate(() => window.miniDiary.invoke('app:bootstrap', undefined))
+  if (!bootstrap.ok) throw new Error('bootstrap failed')
+  expect(bootstrap.data.vaultStatus).toBe('missing')
+  expect(bootstrap.data.prefs.syncEnabled).toBe(false)
+
+  // 重启后仍是首次安装状态，旧密码不能解锁
+  await app.close()
+  const relaunched = await launchApp(homeDir)
+  app = relaunched.app
+  page = relaunched.page
+  await expect(page.locator('#new-password')).toBeVisible()
+  await expect(page.locator('#unlock-password')).toHaveCount(0)
 
   expect(errors).toEqual([])
 })

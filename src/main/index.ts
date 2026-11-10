@@ -12,7 +12,7 @@ import { registerIpcHandlers } from './ipc'
 import { initLogger, logger } from './logger'
 import { installApplicationMenu } from './menu'
 import { installNetworkGuard } from './net-guard'
-import { createMainWindow, setMainWindowLocked } from './window'
+import { createMainWindow, setMainWindowLocked, setMainWindowOnboarding } from './window'
 
 const DEV = !app.isPackaged
 
@@ -138,7 +138,9 @@ if (!singleInstance) {
 
     registerIpcHandlers(context)
     createMainWindow(context.preferences.current)
-    if ((await context.vaultStatus()) === 'locked') setMainWindowLocked(true)
+    const startupStatus = await context.vaultStatus()
+    if (startupStatus === 'locked') setMainWindowLocked(true)
+    else if (startupStatus === 'missing') setMainWindowOnboarding()
     installApplicationMenu(context)
 
     nativeTheme.on('updated', () => {
@@ -155,7 +157,9 @@ if (!singleInstance) {
       void (async () => {
         if (BrowserWindow.getAllWindows().length !== 0 || !context) return
         createMainWindow(context.preferences.current)
-        if ((await context.vaultStatus()) === 'locked') setMainWindowLocked(true)
+        const status = await context.vaultStatus()
+        if (status === 'locked') setMainWindowLocked(true)
+        else if (status === 'missing') setMainWindowOnboarding()
       })()
     })
   })

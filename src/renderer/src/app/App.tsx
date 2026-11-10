@@ -77,7 +77,15 @@ export default function App(): React.JSX.Element {
       subscribe('attachments:changed', () => {
         void useEntriesStore.getState().refreshMissingAttachments()
       }),
-      subscribe('vault:reset', applySnapshot),
+      subscribe('vault:reset', () => {
+        cancelPendingSave()
+        useEntriesStore.getState().clear()
+        useVaultStore.getState().setStatus('missing')
+        const ui = useUiStore.getState()
+        ui.closeLightbox()
+        ui.closeSearchPreview()
+        ui.setView('editor')
+      }),
       subscribe('sync:applied', applySnapshot),
       subscribe('theme:changed', ({ theme: next }) => {
         if (usePrefsStore.getState().prefs?.theme === 'system') {

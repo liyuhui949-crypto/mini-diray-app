@@ -6,7 +6,7 @@ import type { Preferences, StorageStats } from '@shared/types'
 import type { SyncStatus } from '@shared/sync'
 
 import { call, errorMessage } from '@/api/client'
-import { Button, Dialog, Field, Switch } from '@/components/ui'
+import { Button, Dialog, Field, Input, PasswordInput, Switch } from '@/components/ui'
 import { useUiStore } from '@/stores/ui'
 
 import { AttachmentExportDialog, AttachmentImportDialog } from './AttachmentPackageDialogs'
@@ -236,20 +236,20 @@ export function SyncPane(): React.JSX.Element {
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'git'}
-          className={tab === 'git' ? styles.tabActive : styles.tab}
-          onClick={() => setTab('git')}
-        >
-          {copy.sync.gitTab}
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={tab === 'data'}
           className={tab === 'data' ? styles.tabActive : styles.tab}
           onClick={() => setTab('data')}
         >
           {copy.sync.dataTab}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'git'}
+          className={tab === 'git' ? styles.tabActive : styles.tab}
+          onClick={() => setTab('git')}
+        >
+          {copy.sync.gitTab}
         </button>
       </div>
 
@@ -524,19 +524,17 @@ export function SyncPane(): React.JSX.Element {
             <Button
               size="sm"
               variant="danger"
-              disabled={!resetPassword || resetDelete !== 'DELETE' || busy}
+              disabled={!resetPassword || resetDelete !== copy.sync.resetPhrase || busy}
               onClick={doReset}
             >
-              {copy.sync.resetConfirm}
+              {copy.sync.resetPhrase}
             </Button>
           </>
         }
       >
         <Field label={copy.sync.resetPassword} htmlFor="reset-password">
-          <input
+          <PasswordInput
             id="reset-password"
-            className={styles.input}
-            type="password"
             placeholder={copy.sync.resetPasswordPlaceholder}
             autoComplete="current-password"
             value={resetPassword}
@@ -544,10 +542,9 @@ export function SyncPane(): React.JSX.Element {
           />
         </Field>
         <Field label={copy.sync.resetDelete} htmlFor="reset-delete">
-          <input
+          <Input
             id="reset-delete"
-            className={styles.input}
-            placeholder={copy.sync.resetDeletePlaceholder}
+            placeholder={copy.sync.resetPhrase}
             autoComplete="off"
             spellCheck={false}
             value={resetDelete}

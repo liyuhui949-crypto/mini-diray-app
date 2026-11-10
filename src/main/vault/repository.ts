@@ -657,31 +657,20 @@ export class VaultRepository {
     }
   }
 
-  async reset(password: string): Promise<VaultSnapshot> {
+  /** 恢复出厂：验密后删除日记库、附件、批注和迁移临时区 */
+  async destroy(password: string): Promise<void> {
     this.assertUnlocked()
     await this.verifyPassword(password)
-    const data = this.requireData()
-    const now = this.clock().toISOString()
-    const jobId = `reset-${Date.now()}`
-    await createRollbackPoint(this.dir, jobId, { attachments: true })
-    try {
-      data.entries = []
-      data.annotationSeq = 0
-      data.annotationDigests = {}
-      data.updatedAt = now
-      await this.persist(data)
-      await removePath(this.paths.attachmentsDir)
-      await removeAllAnnotations(this.dir)
-      this.annotations = {}
-      await ensureVaultDirs(this.paths)
-      await deleteRollbackPoint(this.dir, jobId)
-    } catch (error) {
-      await restoreRollbackPoint(this.dir, jobId).catch(() => undefined)
-      throw error
-    }
+    const dir = this.dir
+    this.lock()
+    await removePath(this.paths.vaultFile)
+    await removePath(this.paths.attachmentsDir)
+    await removePath(this.paths.migrationDir)
+    await removeAllAnnotations(dir)
+    // 只删空目录；自定义目录里如果还有用户文件就保留
+    await fs.rmdir(dir).catch(() => undefined)
     this.revision += 1
-    logger.info('vault reset')
-    return this.getSnapshot()
+    logger.info('vault destroyed')
   }
 
   /** 整目录搬迁（vault + attachments）；失败回滚 */

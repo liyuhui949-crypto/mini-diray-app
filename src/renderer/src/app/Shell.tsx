@@ -319,7 +319,7 @@ function Sidebar({ collapsed, today }: SidebarProps): React.JSX.Element {
           active={view === 'sync'}
           icon={<Cloud size={15} />}
           label={copy.sync.title}
-          onClick={() => useUiStore.getState().openSync('git')}
+          onClick={() => useUiStore.getState().openSync('data')}
         />
         <NavButton
           active={view === 'attachments'}

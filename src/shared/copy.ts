@@ -337,16 +337,6 @@ export const copy = {
     tooShort: '新密码至少 8 位'
   },
 
-  reset: {
-    title: '清空全部日记',
-    subtitle: '这会删除所有日记与加密附件，密码和日记目录保留，应用仍可继续使用。',
-    warning: '不可恢复，也没有回收站。建议先导出一份迁移包。',
-    keywordLabel: '请输入「清空日记」以继续',
-    keyword: '清空日记',
-    submit: '清空全部内容',
-    success: '日记与附件已清空'
-  },
-
   migration: {
     exportTitle: '导出整个库',
     exportSubtitle:
@@ -517,16 +507,16 @@ export const copy = {
       `附件包导入完成 · 补齐 ${imported} 个${skipped > 0 ? `，跳过 ${skipped} 个已有` : ''}${missing > 0 ? `，仍缺 ${missing} 个` : ''}`,
     missing: (n: number) => `${n} 个附件未迁移`,
     reset: '清空全部数据',
-    resetHint: '清空全部日记、批注与附件，无法撤销；同步配置也会断开',
+    resetHint: '删除本机全部日记、批注、附件、密码和配置，恢复到刚安装的状态；远端仓库不会删除',
     resetAction: '清空…',
-    resetTitle: '清空全部数据',
-    resetDesc: '这会删除全部日记、批注与附件，并断开 Git 同步（远端仓库不动）。',
+    resetTitle: '清空所有数据',
+    resetDesc:
+      '这会删除本机的全部日记、批注、附件、密码和配置，恢复到刚安装的状态。GitHub 上的远端仓库不会删除。',
     resetPassword: '输入日记库密码',
     resetPasswordPlaceholder: '日记库密码',
-    resetDelete: '输入 DELETE 确认',
-    resetDeletePlaceholder: 'DELETE',
-    resetConfirm: '永久清空',
-    resetDone: '已清空全部数据'
+    resetDelete: '请输入「我确定清空全部数据」确认',
+    resetPhrase: '我确定清空全部数据',
+    resetDone: '已恢复到初始状态'
   },
 
   errors: {

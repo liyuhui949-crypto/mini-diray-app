@@ -65,7 +65,7 @@ export interface EventPayloads {
   'job:error': JobErrorPayload
   'migration:open-package': { path: string }
   'attachments:changed': { missing: number }
-  'vault:reset': VaultSnapshot
+  'vault:reset': { status: 'missing' }
   'sync:applied': VaultSnapshot
 }
 
@@ -86,7 +86,7 @@ export interface IpcContract {
   'vault:lock': { req: void; res: void }
   'vault:changePassword': { req: { currentPassword: string; newPassword: string }; res: void }
   'vault:moveDirectory': { req: { targetDir: string }; res: { diaryDir: string } }
-  'vault:reset': { req: { password: string }; res: VaultSnapshot }
+  'vault:reset': { req: { password: string }; res: void }
 
   'entry:save': {
     req: { entry: EntryDraft }

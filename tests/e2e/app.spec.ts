@@ -40,8 +40,12 @@ test.afterAll(async () => {
 test('建库、写作、附件解密、搜索、锁定与重启保持', async () => {
   await launch()
 
-  // 1. 引导页建库
+  // 1. 引导页建库；首次进入窗口与锁定态一样窄
   await expect(page.locator('#new-password')).toBeVisible()
+  const onboarding = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.getBounds()
+  )
+  expect(onboarding?.width).toBeLessThan(700)
   await createVault(page, PASSWORD)
 
   // 2. 写一篇

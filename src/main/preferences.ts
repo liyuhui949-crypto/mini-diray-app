@@ -9,16 +9,16 @@ import type { Preferences } from '@shared/types'
 import { logger } from './logger'
 import { atomicWriteFile } from './vault/paths'
 
-export const PREFERENCES_FILE = 'preferences.json'
+const PREFERENCES_FILE = 'preferences.json'
 
-export function defaultDiaryDir(): string {
+function defaultDiaryDir(): string {
   // 测试/开发隔离：允许把默认日记目录指到临时位置
   const override = process.env['MINIDIARY_DIARY_DIR']
   if (override && override.length > 0) return path.resolve(override)
   return path.join(app.getPath('documents'), 'Mini Diary')
 }
 
-export function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
+function defaultPreferences(diaryDir = defaultDiaryDir()): Preferences {
   return {
     version: 1,
     theme: 'system',
@@ -64,6 +64,13 @@ export class PreferencesStore {
 
   get filePath(): string {
     return this.file
+  }
+
+  /** 恢复出厂：删除偏好文件并回到默认值 */
+  async reset(): Promise<Preferences> {
+    this.cache = { ...this.fallback }
+    await fs.rm(this.file, { force: true })
+    return this.current
   }
 
   async load(): Promise<Preferences> {

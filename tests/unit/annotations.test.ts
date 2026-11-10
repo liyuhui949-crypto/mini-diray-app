@@ -152,7 +152,7 @@ describe('repository annotations', () => {
     }
   })
 
-  it('未来日期拒绝；重置会清空批注文件', async () => {
+  it('未来日期拒绝；销毁会清空批注文件', async () => {
     const dir = await tempDir()
     try {
       const repo = await lockedRepo(dir)
@@ -167,8 +167,8 @@ describe('repository annotations', () => {
       await repo.addAnnotation({ date: todayDate, quote: '', tag: '', body: '留着' })
       expect((await readdir(path.join(dir, 'annotations'))).length).toBe(1)
 
-      await repo.reset(PASSWORD)
-      expect(repo.getSnapshot().annotations).toEqual({})
+      await repo.destroy(PASSWORD)
+      expect(repo.isUnlocked).toBe(false)
       expect(await readdir(path.join(dir, 'annotations')).catch(() => [])).toEqual([])
     } finally {
       await rm(dir, { recursive: true, force: true })

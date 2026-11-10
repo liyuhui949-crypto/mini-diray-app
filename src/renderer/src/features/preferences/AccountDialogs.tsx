@@ -5,8 +5,7 @@ import { PASSWORD_MIN_LENGTH } from '@shared/schemas'
 import { formatBytes } from '@shared/date'
 
 import { call, errorMessage } from '@/api/client'
-import { Button, Dialog, Field, Input, PasswordInput, uiStyles } from '@/components/ui'
-import { useEntriesStore } from '@/stores/entries'
+import { Button, Dialog, Field, PasswordInput, uiStyles } from '@/components/ui'
 import { useUiStore } from '@/stores/ui'
 
 export function ChangePasswordDialog({
@@ -94,88 +93,6 @@ export function ChangePasswordDialog({
           autoComplete="new-password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
-        />
-      </Field>
-      {error ? <p className={uiStyles.error}>{error}</p> : null}
-    </Dialog>
-  )
-}
-
-interface ConfirmState {
-  password: string
-  keyword: string
-}
-
-export function ResetVaultDialog({
-  open,
-  onClose
-}: {
-  open: boolean
-  onClose: () => void
-}): React.JSX.Element {
-  const [state, setState] = useState<ConfirmState>({ password: '', keyword: '' })
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const pushToast = useUiStore((state) => state.pushToast)
-
-  useEffect(() => {
-    if (!open) {
-      setState({ password: '', keyword: '' })
-      setError(null)
-      setBusy(false)
-    }
-  }, [open])
-
-  const submit = async (): Promise<void> => {
-    if (state.keyword.trim() !== copy.reset.keyword) {
-      setError(`请输入「${copy.reset.keyword}」`)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const snapshot = await call('vault:reset', { password: state.password })
-      useEntriesStore.getState().loadSnapshot(snapshot)
-      pushToast(copy.reset.success)
-      onClose()
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(value) => {
-        if (!value) onClose()
-      }}
-      title={copy.reset.title}
-      description={`${copy.reset.subtitle}\n${copy.reset.warning}`}
-      footer={
-        <>
-          <Button onClick={onClose}>{copy.common.cancel}</Button>
-          <Button variant="danger" disabled={busy} onClick={() => void submit()}>
-            {busy ? copy.common.loading : copy.reset.submit}
-          </Button>
-        </>
-      }
-    >
-      <Field label="日记密码" htmlFor="reset-password">
-        <PasswordInput
-          id="reset-password"
-          autoComplete="current-password"
-          value={state.password}
-          onChange={(event) => setState({ ...state, password: event.target.value })}
-        />
-      </Field>
-      <Field label={copy.reset.keywordLabel} htmlFor="reset-keyword">
-        <Input
-          id="reset-keyword"
-          value={state.keyword}
-          placeholder={copy.reset.keyword}
-          onChange={(event) => setState({ ...state, keyword: event.target.value })}
         />
       </Field>
       {error ? <p className={uiStyles.error}>{error}</p> : null}

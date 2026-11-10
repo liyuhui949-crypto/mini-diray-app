@@ -17,7 +17,6 @@ export type ListScope = 'month' | 'all'
 
 export type DialogName =
   | 'changePassword'
-  | 'resetVault'
   | 'migrationExport'
   | 'migrationImport'
   | 'import'
@@ -107,7 +106,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   lightboxDate: null,
   lightboxOrphan: null,
   toasts: [],
-  syncTab: 'git',
+  syncTab: 'data',
   previewMode: false,
   calendarMonth: todayLocalDate(),
   listScope: 'month',
@@ -119,7 +118,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   attachmentPreviewAttachmentId: null,
   searchJump: null,
   setView: (view) => set({ view, dialog: null }),
-  openSync: (tab = 'git') => set({ view: 'sync', dialog: null, syncTab: tab }),
+  openSync: (tab = 'data') => set({ view: 'sync', dialog: null, syncTab: tab }),
   setSyncTab: (tab) => set({ syncTab: tab }),
   openSearchPreview: (searchPreviewDate) => set({ searchPreviewDate }),
   closeSearchPreview: () => set({ searchPreviewDate: null }),
