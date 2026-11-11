@@ -221,18 +221,9 @@ export function MissingAttachmentCard({ attachment }: { attachment: Attachment }
       <span className={styles.missingBody}>
         <b>{attachment.name}</b>
         <i>
-          附件尚未迁移 · {formatBytes(attachment.size)} · 这篇正文来自 Git 同步；在「数据 → 仅迁移附件」导入后自动补齐
+          附件尚未迁移 · {formatBytes(attachment.size)}
         </i>
       </span>
-      <button
-        type="button"
-        className={styles.missingAction}
-        onClick={() => {
-          useUiStore.getState().openSync('data')
-        }}
-      >
-        去迁移 →
-      </button>
     </div>
   )
 }
