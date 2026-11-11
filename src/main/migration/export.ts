@@ -54,7 +54,10 @@ function portablePrefs(prefs: Preferences): PortablePreferences {
     theme: prefs.theme,
     hideTitle: prefs.hideTitle,
     allowFutureEntries: prefs.allowFutureEntries,
-    autoLockMinutes: prefs.autoLockMinutes
+    autoLockMinutes: prefs.autoLockMinutes,
+    syncEnabled: prefs.syncEnabled === true,
+    syncRepo: prefs.syncRepo ?? null,
+    syncBranch: prefs.syncBranch ?? 'main'
   }
 }
 

@@ -26,7 +26,7 @@ export const SUPPORTED_FORMAT_VERSION = 1
 export const SUPPORTED_SCHEMA_VERSION = 1
 export const VAULT_FILE_NAME = 'diary.vault'
 
-const kdfSchema = z.object({
+export const kdfSchema = z.object({
   name: z.literal('scrypt'),
   N: z.number().int().positive(),
   r: z.number().int().positive(),
@@ -34,7 +34,7 @@ const kdfSchema = z.object({
   salt: z.string().min(1)
 })
 
-const cipherBlockSchema = z.object({
+export const cipherBlockSchema = z.object({
   alg: z.literal('AES-256-GCM'),
   iv: z.string().min(1),
   ciphertext: z.string(),
@@ -105,6 +105,15 @@ export interface NewEnvelope {
 
 /** 创建信封：随机 DEK，用 KEK 包裹，并用 payloadKey 加密整个 VaultData */
 export async function createEnvelope(options: CreateOptions): Promise<NewEnvelope> {
+  const dek = randomBytesBuffer(KEY_BYTES)
+  const envelope = await createEnvelopeWithDek({ ...options, dek })
+  return { envelope, dek }
+}
+
+/** 用已有的 DEK 创建信封；用于从 .inkkey 恢复同一把钥匙，不重新生成库密钥 */
+export async function createEnvelopeWithDek(
+  options: CreateOptions & { dek: Buffer }
+): Promise<VaultEnvelope> {
   const salt = options.salt ?? newSalt()
   const scryptParams = options.scrypt ?? SCRYPT_PARAMS
   const kdf: KdfDescriptor = {
@@ -114,25 +123,26 @@ export async function createEnvelope(options: CreateOptions): Promise<NewEnvelop
     p: scryptParams.p,
     salt: salt.toString('base64')
   }
-  const dek = randomBytesBuffer(KEY_BYTES)
+  const dek = options.dek
 
   const kek = await deriveKek(options.password, salt, kdf)
   try {
     const keyWrap = encryptSecret(kek, dek, keyWrapAad(kdf))
     const payloadKey = derivePayloadKey(dek, options.data.vaultId)
     try {
-      const payload = encryptGcm(payloadKey, Buffer.from(JSON.stringify(options.data), 'utf8'), payloadAad(options.data.vaultId))
+      const payload = encryptGcm(
+        payloadKey,
+        Buffer.from(JSON.stringify(options.data), 'utf8'),
+        payloadAad(options.data.vaultId)
+      )
       return {
-        dek,
-        envelope: {
-          magic: VAULT_MAGIC,
-          formatVersion: SUPPORTED_FORMAT_VERSION,
-          vaultId: options.data.vaultId,
-          createdAt: options.data.createdAt,
-          kdf,
-          keyWrap,
-          payload
-        }
+        magic: VAULT_MAGIC,
+        formatVersion: SUPPORTED_FORMAT_VERSION,
+        vaultId: options.data.vaultId,
+        createdAt: options.data.createdAt,
+        kdf,
+        keyWrap,
+        payload
       }
     } finally {
       wipe(payloadKey)

@@ -34,6 +34,7 @@ import {
   SUPPORTED_SCHEMA_VERSION,
   assertSupportedSchema,
   createEnvelope,
+  createEnvelopeWithDek,
   createPackageKeyEnvelope,
   createVaultData,
   openPackageKeyEnvelope,
@@ -46,6 +47,7 @@ import {
   serializeEnvelope,
   type VaultEnvelope
 } from './format'
+import { createKeyBackup, type KeyBackup } from './keyBackup'
 import {
   atomicWriteFile,
   ensureVaultDirs,
@@ -58,20 +60,20 @@ import {
 } from './paths'
 import { cleanupStaleArtifacts, deleteRollbackPoint, restoreRollbackPoint, createRollbackPoint } from './rollback'
 
-export interface RepositoryOptions {
+interface RepositoryOptions {
   dir: string
   clock?: () => Date
   /** 仅测试使用：降低 KDF 成本 */
   scrypt?: ScryptParams
 }
 
-export interface SaveResult {
+interface SaveResult {
   revision: number
   entry: DiaryEntry | null
   savedAt: string
 }
 
-export interface MergeResult {
+interface MergeResult {
   revision: number
   added: number
   merged: number
@@ -453,6 +455,48 @@ export class VaultRepository {
     return this.getSnapshot()
   }
 
+  /** 导出只含 DEK 的恢复密钥，不包含正文/附件 */
+  async createKeyBackup(
+    password: string,
+    sync?: { repo: string; branch: string }
+  ): Promise<KeyBackup> {
+    this.assertUnlocked()
+    if (!this.envelope || !this.dek) throw new AppError('VAULT_LOCKED')
+    return createKeyBackup({
+      vaultId: this.envelope.vaultId,
+      dek: this.dek,
+      password,
+      ...(sync ? { sync } : {}),
+      ...(this.scrypt ? { scrypt: this.scrypt } : {})
+    })
+  }
+
+  /** 用恢复密钥里的 DEK/vaultId 创建空库；正文随后从 Git 拉取 */
+  async createFromKey(vaultId: string, dek: Buffer, password: string): Promise<VaultSnapshot> {
+    if (await this.exists()) throw new AppError('BUSY', '日记库已存在')
+    const data = createVaultData(this.clock())
+    data.vaultId = vaultId
+    const envelope = await createEnvelopeWithDek({
+      password,
+      data,
+      dek,
+      ...(this.scrypt ? { scrypt: this.scrypt } : {})
+    })
+    await ensureVaultDirs(this.paths)
+    await atomicWriteFile(this.paths.vaultFile, serializeEnvelope(envelope))
+
+    this.envelope = envelope
+    this.dek = dek
+    this.attachmentKey = deriveAttachmentKey(dek, vaultId)
+    this.syncKeyCache = null
+    this.annotationKeyCache = annotationKey(dek, vaultId)
+    this.data = data
+    this.annotations = {}
+    this.revision = 1
+    logger.info('vault created from key backup')
+    return this.getSnapshot()
+  }
+
   async unlock(password: string): Promise<VaultSnapshot> {
     if (this.isUnlocked) return this.getSnapshot()
     const exists = await this.exists()
@@ -658,9 +702,10 @@ export class VaultRepository {
   }
 
   /** 恢复出厂：验密后删除日记库、附件、批注和迁移临时区 */
-  async destroy(password: string): Promise<void> {
+  async destroy(password: string, beforeDelete?: () => Promise<void>): Promise<void> {
     this.assertUnlocked()
     await this.verifyPassword(password)
+    await beforeDelete?.()
     const dir = this.dir
     this.lock()
     await removePath(this.paths.vaultFile)

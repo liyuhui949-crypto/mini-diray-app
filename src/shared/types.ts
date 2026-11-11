@@ -123,7 +123,13 @@ export interface Preferences {
 /** 迁移包内可移植的偏好子集（不含机器相关字段） */
 export type PortablePreferences = Pick<
   Preferences,
-  'theme' | 'hideTitle' | 'allowFutureEntries' | 'autoLockMinutes'
+  | 'theme'
+  | 'hideTitle'
+  | 'allowFutureEntries'
+  | 'autoLockMinutes'
+  | 'syncEnabled'
+  | 'syncRepo'
+  | 'syncBranch'
 >
 
 export type ImportFormat = 'dayOneJson' | 'jrnlJson' | 'miniDiaryJson' | 'dayOneTxt'

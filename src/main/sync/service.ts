@@ -7,6 +7,7 @@ import { todayLocalDate } from '@shared/date'
 
 import type { PreferencesStore } from '../preferences'
 import type { VaultRepository } from '../vault/repository'
+import { pathExists } from '../vault/paths'
 import {
   aheadBehind,
   checkoutRemoteBranch,
@@ -24,7 +25,7 @@ import {
   statusPorcelain,
   type GitRunOptions
 } from './git'
-import { buildMirror, readMirror, syncRoot } from './mirror'
+import { buildMirror, readMirror, readMirrorVaultId, syncRoot } from './mirror'
 import { SyncSecrets } from './secrets'
 
 interface SyncServiceDeps {
@@ -87,6 +88,33 @@ export class SyncService {
       return await fn(key, this.repository.getVaultId())
     } finally {
       key.fill(0)
+    }
+  }
+
+  /** 清空/重建前调用；有同步任务时拒绝改动 .sync */
+  assertIdle(): void {
+    if (this.running) throw new AppError('SYNC_BUSY')
+  }
+
+  /** 删除派生镜像并确认真的删掉了；失败时抛出，不静默继续清空 */
+  async clearMirror(): Promise<void> {
+    const root = syncRoot(this.repository.vaultDir)
+    const message = '同步文件夹删除失败，请关闭占用它的程序后重试'
+    try {
+      await fs.rm(root, { recursive: true, force: true })
+    } catch {
+      throw new AppError('IO_ERROR', message)
+    }
+    if (await pathExists(root)) throw new AppError('IO_ERROR', message)
+  }
+
+  /** 旧 vault 留下的镜像不能复用，否则新仓库会被误判成“另一个日记库” */
+  private async discardMismatchedMirror(): Promise<void> {
+    if (!this.repository.isUnlocked) return
+    const root = syncRoot(this.repository.vaultDir)
+    const vaultId = await readMirrorVaultId(root)
+    if (vaultId && vaultId !== this.repository.getVaultId()) {
+      await this.clearMirror()
     }
   }
 
@@ -178,7 +206,9 @@ export class SyncService {
     proxy?: string | null
     token?: string
   }): Promise<SyncStatus> {
+    this.assertIdle()
     const repo = validateRepoUrl(input.repo)
+    const previousRepo = this.preferences.current.syncRepo
     if (input.token !== undefined && input.token.trim().length === 0) {
       throw new AppError('INVALID_INPUT', '访问令牌不能为空')
     }
@@ -192,6 +222,8 @@ export class SyncService {
       syncProxy: normalizeProxy(input.proxy)
     })
 
+    // 换仓库时旧镜像直接作废；本地正文仍在 vault，下一次推送会重建
+    if (previousRepo && previousRepo !== repo) await this.clearMirror()
     if (this.preferences.current.syncEnabled === true) await this.prepareRepo()
     return this.status()
   }
@@ -237,6 +269,7 @@ export class SyncService {
 
   /** 探测系统 git，并在已配置仓库时初始化本地 .sync（纯本地操作） */
   private async prepareRepo(): Promise<void> {
+    await this.discardMismatchedMirror()
     await findGit()
     const repo = this.preferences.current.syncRepo
     if (repo) await initRepo(syncRoot(this.repository.vaultDir), repo)

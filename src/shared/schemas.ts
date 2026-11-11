@@ -128,7 +128,10 @@ export const portablePreferencesSchema = z.object({
   theme: themeModeSchema,
   hideTitle: z.boolean(),
   allowFutureEntries: z.boolean(),
-  autoLockMinutes: autoLockSchema
+  autoLockMinutes: autoLockSchema,
+  syncEnabled: z.boolean().optional(),
+  syncRepo: z.string().max(2048).nullable().optional(),
+  syncBranch: z.string().max(128).optional()
 })
 
 export const PASSWORD_MIN_LENGTH = 8

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { PreferencesStore } from '../../src/main/preferences'
 import { VaultRepository } from '../../src/main/vault/repository'
 import { SyncService } from '../../src/main/sync/service'
+import { pathExists } from '../../src/main/vault/paths'
+import { openKeyBackup } from '../../src/main/vault/keyBackup'
 
 const exec = promisify(execFile)
 const FAST = { N: 1024, r: 8, p: 1 }
@@ -157,6 +159,93 @@ describe('SyncService', () => {
         '2026-11-08',
         '2026-11-09'
       ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('旧 vault 的同步镜像会被丢弃，新空仓库拉取不报另一个库', async () => {
+    process.env['MINIDIARY_ALLOW_LOCAL_REMOTE'] = '1'
+    const root = await tempDir()
+    const remote = path.join(root, 'remote.git')
+    const dir = path.join(root, 'diary')
+    try {
+      await exec('git', ['init', '--bare', remote])
+      const repo = new VaultRepository({ dir, scrypt: FAST })
+      await repo.create(PASSWORD)
+      const syncDir = path.join(dir, '.sync')
+      await mkdir(syncDir, { recursive: true })
+      await writeFile(
+        path.join(syncDir, 'sync.json'),
+        JSON.stringify({ format: 1, vaultId: 'old-vault-id' })
+      )
+      const prefs = new PreferencesStore({
+        file: path.join(root, 'prefs.json'),
+        defaultDiaryDir: dir
+      })
+      const service = new SyncService({
+        repository: repo,
+        preferences: prefs,
+        secrets: fakeSecrets as never
+      })
+      await service.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await service.setEnabled(true)
+
+      await expect(service.pull()).resolves.toEqual({ entries: 0, annotations: 0 })
+      expect(await pathExists(path.join(syncDir, 'sync.json'))).toBe(false)
+
+      await repo.saveEntry(draft('2026-11-08', '新库', '新库正文'))
+      await service.push()
+      const meta = JSON.parse(await readFile(path.join(syncDir, 'sync.json'), 'utf8')) as {
+        vaultId: string
+      }
+      expect(meta.vaultId).toBe(repo.getVaultId())
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('用 .inkkey 恢复空库后可以拉取同一 Git 仓库', async () => {
+    process.env['MINIDIARY_ALLOW_LOCAL_REMOTE'] = '1'
+    const root = await tempDir()
+    const remote = path.join(root, 'remote.git')
+    const sourceDir = path.join(root, 'source')
+    const targetDir = path.join(root, 'target')
+    try {
+      await exec('git', ['init', '--bare', remote])
+      const sourceRepo = new VaultRepository({ dir: sourceDir })
+      await sourceRepo.create(PASSWORD)
+      await sourceRepo.saveEntry(draft('2026-11-08', '密钥恢复', '从 Git 拉回来'))
+      const source = new SyncService({
+        repository: sourceRepo,
+        preferences: new PreferencesStore({
+          file: path.join(root, 'source-prefs.json'),
+          defaultDiaryDir: sourceDir
+        }),
+        secrets: fakeSecrets as never
+      })
+      await source.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await source.setEnabled(true)
+      await source.push()
+
+      const backup = await sourceRepo.createKeyBackup('backup-password')
+      const { dek } = await openKeyBackup(backup, 'backup-password')
+      const targetRepo = new VaultRepository({ dir: targetDir, scrypt: FAST })
+      await targetRepo.createFromKey(backup.vaultId, dek, 'new-diary-password')
+      expect(targetRepo.getSnapshot().vaultId).toBe(backup.vaultId)
+
+      const target = new SyncService({
+        repository: targetRepo,
+        preferences: new PreferencesStore({
+          file: path.join(root, 'target-prefs.json'),
+          defaultDiaryDir: targetDir
+        }),
+        secrets: fakeSecrets as never
+      })
+      await target.configure({ repo: `file://${remote}`, branch: 'main', token: 'fake-token' })
+      await target.setEnabled(true)
+      await target.pull()
+      expect(targetRepo.getSnapshot().entries.map((entry) => entry.title)).toContain('密钥恢复')
     } finally {
       await rm(root, { recursive: true, force: true })
     }

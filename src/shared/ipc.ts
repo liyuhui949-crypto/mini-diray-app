@@ -87,6 +87,10 @@ export interface IpcContract {
   'vault:changePassword': { req: { currentPassword: string; newPassword: string }; res: void }
   'vault:moveDirectory': { req: { targetDir: string }; res: { diaryDir: string } }
   'vault:reset': { req: { password: string }; res: void }
+  'vault:restoreKeyBackup': {
+    req: { filePath: string; backupPassword: string }
+    res: VaultSnapshot
+  }
 
   'entry:save': {
     req: { entry: EntryDraft }
@@ -126,7 +130,7 @@ export interface IpcContract {
 
   'dialog:pickDirectory': { req: { purpose: string }; res: { path: string | null } }
   'dialog:openFile': {
-    req: { purpose: 'import' | 'migration'; format?: ImportFormat }
+    req: { purpose: 'import' | 'migration' | 'key'; format?: ImportFormat }
     res: { path: string | null }
   }
 
@@ -171,7 +175,7 @@ export interface IpcContract {
   'sync:push': { req: void; res: { commits: number; changed: number } }
   'sync:pull': { req: void; res: { entries: number; annotations: number } }
   'sync:missingAttachments': { req: void; res: SyncMissingAttachment[] }
-  'sync:openFolder': { req: void; res: void }
+  'sync:exportKeyBackup': { req: { password: string }; res: { path: string | null } }
 
   'attachment:exportPackage': {
     req: { packageKey: string; packagePassword: string }
@@ -207,6 +211,15 @@ export const requestValidators: RequestValidators = {
     z.object({ targetDir: optionalString }).parse(payload) as IpcContract['vault:moveDirectory']['req'],
   'vault:reset': (payload) =>
     z.object({ password: z.string().min(1).max(200) }).parse(payload) as IpcContract['vault:reset']['req'],
+  'vault:restoreKeyBackup': (payload) =>
+    z
+      .object({
+        filePath: optionalString,
+        backupPassword: passwordSchema
+      })
+      .parse(payload) as IpcContract['vault:restoreKeyBackup']['req'],
+  'sync:exportKeyBackup': (payload) =>
+    z.object({ password: passwordSchema }).parse(payload) as IpcContract['sync:exportKeyBackup']['req'],
   'entry:save': (payload) =>
     z.object({ entry: entryDraftSchema }).parse(payload) as IpcContract['entry:save']['req'],
   'annotation:add': (payload) =>
@@ -246,7 +259,7 @@ export const requestValidators: RequestValidators = {
     z.object({ purpose: z.string().max(64) }).parse(payload) as IpcContract['dialog:pickDirectory']['req'],
   'dialog:openFile': (payload) =>
     z
-      .object({ purpose: z.enum(['import', 'migration']), format: importFormatSchema.optional() })
+      .object({ purpose: z.enum(['import', 'migration', 'key']), format: importFormatSchema.optional() })
       .parse(payload) as IpcContract['dialog:openFile']['req'],
   'migration:export': (payload) =>
     z

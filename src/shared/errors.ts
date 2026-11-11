@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'UNSUPPORTED'
   | 'PACKAGE_KEY_REQUIRED'
   | 'PACKAGE_VERSION_UNSUPPORTED'
+  | 'KEY_BACKUP_INVALID'
   | 'GIT_NOT_FOUND'
   | 'GIT_AUTH_FAILED'
   | 'GIT_NETWORK'
@@ -48,6 +49,7 @@ const defaultMessages: Record<ErrorCode, string> = {
   UNSUPPORTED: '不支持的操作',
   PACKAGE_KEY_REQUIRED: copy.errors.packageKeyRequired,
   PACKAGE_VERSION_UNSUPPORTED: copy.errors.packageVersionUnsupported,
+  KEY_BACKUP_INVALID: '恢复密钥文件无效或已损坏',
   GIT_NOT_FOUND: '没有找到系统 git，请先安装 Git 并重新打开应用',
   GIT_AUTH_FAILED: 'Git 认证失败，请检查访问令牌是否有效',
   GIT_NETWORK: '无法连接 Git 仓库，请检查网络或代理',

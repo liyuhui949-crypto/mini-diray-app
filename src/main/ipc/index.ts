@@ -36,8 +36,9 @@ import { logger } from '../logger'
 import { exportMigrationPackage } from '../migration/export'
 import { defaultPackageFileName } from '../migration/package'
 import { exportAttachmentPackage, importAttachmentPackage } from '../sync/attachmentPackage'
-import { syncRoot } from '../sync/mirror'
-import { ensureVaultDirs, pathExists, removePath, vaultPaths } from '../vault/paths'
+import { wipe } from '../vault/crypto'
+import { openKeyBackup, parseKeyBackup } from '../vault/keyBackup'
+import { atomicWriteFile, ensureVaultDirs, vaultPaths } from '../vault/paths'
 import { isTrustedWebContents, setMainWindowLocked, setMainWindowOnboarding } from '../window'
 
 function resolveTheme(context: AppContext): ThemeSource {
@@ -193,10 +194,37 @@ export function registerIpcHandlers(context: AppContext): void {
     return result
   })
 
+  register('vault:restoreKeyBackup', async ({ filePath, backupPassword }) => {
+    if (!path.isAbsolute(filePath)) throw new AppError('INVALID_INPUT', '恢复密钥路径不合法')
+    if (await repository.exists()) throw new AppError('BUSY', '日记库已存在')
+    const stats = await fs.stat(filePath).catch(() => {
+      throw new AppError('IO_ERROR', '无法读取恢复密钥文件')
+    })
+    if (stats.size > 64 * 1024) throw new AppError('KEY_BACKUP_INVALID')
+    const backup = parseKeyBackup(await fs.readFile(filePath, 'utf8'))
+    const opened = await openKeyBackup(backup, backupPassword)
+    try {
+      const snapshot = await repository.createFromKey(backup.vaultId, opened.dek, backupPassword)
+      if (opened.sync && /^https:\/\//i.test(opened.sync.repo)) {
+        const next = await preferences.update({
+          syncRepo: opened.sync.repo,
+          syncBranch: opened.sync.branch,
+          syncEnabled: true
+        })
+        broadcast(EVENTS.prefsChanged, next)
+      }
+      setMainWindowLocked(false)
+      return snapshot
+    } catch (error) {
+      wipe(opened.dek)
+      throw error
+    }
+  })
+
   register('vault:reset', async ({ password }) => {
-    const oldDir = context.diaryDir
-    await repository.destroy(password)
-    await removePath(syncRoot(oldDir)).catch(() => undefined)
+    context.sync.assertIdle()
+    // destroy 验密后先删镜像；镜像删不掉就不继续删除日记库
+    await repository.destroy(password, () => context.sync.clearMirror())
     await context.sync.clearToken().catch(() => undefined)
     const prefs = await preferences.reset()
     context.applyDiaryDir(prefs.diaryDir)
@@ -341,9 +369,17 @@ export function registerIpcHandlers(context: AppContext): void {
     const filters =
       purpose === 'migration'
         ? [{ name: 'Mini Diary 迁移包', extensions: ['minidiary'] }]
-        : importFilters(format)
+        : purpose === 'key'
+          ? [{ name: 'Mini Diary 恢复密钥', extensions: ['inkkey'] }]
+          : importFilters(format)
+    const title =
+      purpose === 'migration'
+        ? copy.migration.importTitle
+        : purpose === 'key'
+          ? copy.keyBackup.restoreTitle
+          : copy.importDialog.title
     const result = await showOpen(event, {
-      title: purpose === 'migration' ? copy.migration.importTitle : copy.importDialog.title,
+      title,
       properties: ['openFile'],
       filters
     })
@@ -395,7 +431,10 @@ export function registerIpcHandlers(context: AppContext): void {
           theme: result.prefs.theme,
           hideTitle: result.prefs.hideTitle,
           allowFutureEntries: result.prefs.allowFutureEntries,
-          autoLockMinutes: result.prefs.autoLockMinutes
+          autoLockMinutes: result.prefs.autoLockMinutes,
+          syncEnabled: Boolean(result.prefs.syncEnabled && result.prefs.syncRepo),
+          syncRepo: result.prefs.syncRepo ?? null,
+          syncBranch: result.prefs.syncBranch ?? 'main'
         })
         broadcast(EVENTS.prefsChanged, next)
       }
@@ -476,9 +515,17 @@ export function registerIpcHandlers(context: AppContext): void {
   // ───────────────────────── git sync / attachment package ─────────────────────────
   register('sync:status', async () => context.sync.status())
 
-  register('sync:configure', async (payload) => context.sync.configure(payload))
+  register('sync:configure', async (payload) => {
+    const status = await context.sync.configure(payload)
+    broadcast(EVENTS.prefsChanged, preferences.current)
+    return status
+  })
 
-  register('sync:setEnabled', async ({ enabled }) => context.sync.setEnabled(enabled))
+  register('sync:setEnabled', async ({ enabled }) => {
+    const status = await context.sync.setEnabled(enabled)
+    broadcast(EVENTS.prefsChanged, preferences.current)
+    return status
+  })
 
   register('sync:test', async () => context.sync.test())
 
@@ -498,13 +545,23 @@ export function registerIpcHandlers(context: AppContext): void {
 
   register('sync:missingAttachments', async () => context.sync.missingAttachments())
 
-  register('sync:openFolder', async () => {
-    const dir = syncRoot(context.diaryDir)
-    if (!(await pathExists(dir))) {
-      throw new AppError('NOT_FOUND', '同步文件夹尚未生成，请先开启同步并推送一次')
-    }
-    const error = await shell.openPath(dir)
-    if (error) throw new AppError('IO_ERROR', '无法打开同步文件夹')
+  register('sync:exportKeyBackup', async ({ password }, event) => {
+    if (!repository.isUnlocked) throw new AppError('VAULT_LOCKED')
+    const directory = preferences.current.lastExportDir ?? app.getPath('documents')
+    const result = await showSave(event, {
+      title: copy.keyBackup.exportTitle,
+      defaultPath: path.join(directory, `minidiary-recovery-${todayLocalDate()}.inkkey`),
+      filters: [{ name: 'Mini Diary 恢复密钥', extensions: ['inkkey'] }]
+    })
+    if (result.canceled || !result.filePath) return { path: null }
+    const current = preferences.current
+    const sync = current.syncRepo
+      ? { repo: current.syncRepo, branch: current.syncBranch ?? 'main' }
+      : undefined
+    const backup = await repository.createKeyBackup(password, sync)
+    await atomicWriteFile(result.filePath, JSON.stringify(backup, null, 2), 0o600)
+    await preferences.update({ lastExportDir: path.dirname(result.filePath) })
+    return { path: result.filePath }
   })
 
   register('attachment:exportPackage', async (payload, event) => {

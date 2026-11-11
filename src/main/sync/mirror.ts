@@ -135,6 +135,10 @@ function dateFromAnnotationName(name: string): string | null {
   return match?.[1] ?? null
 }
 
+export async function readMirrorVaultId(root: string): Promise<string | null> {
+  return (await readMeta(root))?.vaultId ?? null
+}
+
 /**
  * 从 vault 生成/更新镜像。
  * - 只写今天以前的条目与批注；
