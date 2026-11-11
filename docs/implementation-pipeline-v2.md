@@ -1806,7 +1806,7 @@ node scripts/package-dir.mjs   # electron-builder --dir（需 ELECTRON_MIRROR，
 ### 15.26 Git 同步（系统 git）
 
 - **范围**：只同步正文与批注；今天的内容与附件不进入 Git；附件走 `.inkatt` 导入/导出；
-- **不内置 git**：调用系统 `git`，代理/令牌通过子进程环境注入，令牌用日记库 DEK 派生密钥加密，不依赖系统钥匙串；
+- **不内置 git**：调用系统 `git`，代理/令牌通过子进程环境注入，令牌用日记库 DEK 派生密钥加密，不依赖系统钥匙串；`.inkkey` 恢复密钥只包裹 DEK；
 - **镜像**：`<日记目录>/.sync` 下生成 `entries/*.ink` + `annotations/*.ann`，本地 `diary.vault` 不变；
   推送只提交有变化的文件（M）；拉取 ff-only 后解密合并，今天/未来日期不参与；
 - **附件缺失态**：正文占位卡、列表 `缺 n 附件`、状态栏 `n 个（m 个未迁移）` 三处联动；
