@@ -60,6 +60,7 @@ export function SyncPane(): React.JSX.Element {
   const [resetPassword, setResetPassword] = useState('')
   const [resetDelete, setResetDelete] = useState('')
   const pushToast = useUiStore((state) => state.pushToast)
+  const openDialog = useUiStore((state) => state.openDialog)
 
   const refresh = useCallback(async (): Promise<void> => {
     const next = await call('sync:status', undefined)
@@ -184,7 +185,7 @@ export function SyncPane(): React.JSX.Element {
           { tone: 'success' }
         )
       },
-      '拉取失败 · 请检查网络或代理后重试'
+      '拉取失败'
     )
   }
 
@@ -206,7 +207,6 @@ export function SyncPane(): React.JSX.Element {
   }
 
   const openDir = (): void => openFolder(() => call('app:openDiaryDir', undefined))
-  const openSyncFolder = (): void => openFolder(() => call('sync:openFolder', undefined))
 
   const changeDir = (): void => {
     void run('save', async () => {
@@ -280,6 +280,16 @@ export function SyncPane(): React.JSX.Element {
 
           {enabled ? (
             <>
+              <div className={styles.card}>
+                <div>
+                  <div className={styles.label}>{copy.keyBackup.settingsTitle}</div>
+                  <div className={styles.hint}>{copy.keyBackup.syncHint}</div>
+                </div>
+                <Button size="sm" variant="primary" onClick={() => openDialog('keyBackup')}>
+                  {copy.keyBackup.exportSubmit}
+                </Button>
+              </div>
+
               {!gitReady ? <div className={styles.warn}>{copy.sync.gitMissing}</div> : null}
               {gitReady && !configured ? (
                 <div className={styles.warn}>{copy.sync.notConfigured}</div>
@@ -428,15 +438,6 @@ export function SyncPane(): React.JSX.Element {
             </div>
           </div>
 
-          <div className={styles.card}>
-            <div>
-              <div className={styles.label}>{copy.sync.syncFolder}</div>
-              <div className={styles.hint}>{copy.sync.syncFolderHint}</div>
-            </div>
-            <Button size="sm" onClick={openSyncFolder}>
-              {copy.sync.openSyncFolder}
-            </Button>
-          </div>
             </>
           ) : null}
         </section>
@@ -470,23 +471,14 @@ export function SyncPane(): React.JSX.Element {
               <div className={styles.label}>{copy.sync.migration}</div>
               <div className={styles.hint}>{copy.sync.migrationHint}</div>
             </div>
-            <div className={styles.actions}>
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() => useUiStore.getState().openDialog('migrationImport')}
-              >
-                {copy.sync.migrationImport}
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={busy}
-                onClick={() => useUiStore.getState().openDialog('migrationExport')}
-              >
-                {copy.sync.migrationExport}
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy}
+              onClick={() => useUiStore.getState().openDialog('migrationExport')}
+            >
+              {copy.sync.migrationExport}
+            </Button>
           </div>
 
           <div className={styles.card}>

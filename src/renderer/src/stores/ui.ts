@@ -17,6 +17,7 @@ export type ListScope = 'month' | 'all'
 
 export type DialogName =
   | 'changePassword'
+  | 'keyBackup'
   | 'migrationExport'
   | 'migrationImport'
   | 'import'

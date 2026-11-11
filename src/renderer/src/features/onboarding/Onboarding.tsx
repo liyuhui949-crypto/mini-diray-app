@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Lock, PackageOpen } from 'lucide-react'
+import { GitBranch, Lock, PackageOpen, Plus } from 'lucide-react'
 
 import { copy } from '@shared/copy'
 import { PASSWORD_MIN_LENGTH } from '@shared/schemas'
@@ -10,6 +10,8 @@ import { PasswordInput } from '@/components/ui'
 import { useEntriesStore } from '@/stores/entries'
 import { useUiStore } from '@/stores/ui'
 import { useVaultStore } from '@/stores/vault'
+
+import { KeyRestoreDialog } from './KeyRestoreDialog'
 
 import styles from '@/styles/auth.module.scss'
 
@@ -37,6 +39,8 @@ export function Onboarding(): React.JSX.Element {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [restoreOpen, setRestoreOpen] = useState(false)
+  const [mode, setMode] = useState<'choose' | 'create'>('choose')
   const pushToast = useUiStore((state) => state.pushToast)
   const openDialog = useUiStore((state) => state.openDialog)
   const strength = strengthOf(password)
@@ -65,77 +69,124 @@ export function Onboarding(): React.JSX.Element {
     }
   }
 
+  const heading = (
+    <>
+      <div className={styles.mark}>
+        <Lock size={20} />
+      </div>
+      <h1 className={styles.title}>
+        {mode === 'choose' ? copy.onboarding.chooseTitle : copy.onboarding.title}
+      </h1>
+      <p className={styles.subtitle}>
+        {mode === 'choose' ? copy.onboarding.chooseSubtitle : copy.onboarding.subtitle}
+      </p>
+    </>
+  )
+
   return (
     <div className={styles.screen}>
-      <form className={styles.card} onSubmit={submit}>
-        <div className={styles.mark}>
-          <Lock size={20} />
-        </div>
-        <h1 className={styles.title}>{copy.onboarding.title}</h1>
-        <p className={styles.subtitle}>{copy.onboarding.subtitle}</p>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="new-password">
-            {copy.onboarding.passwordLabel}
-          </label>
-          <PasswordInput
-            id="new-password"
-            className={styles.passwordInput}
-            autoFocus
-            autoComplete="new-password"
-            value={password}
-            placeholder={copy.onboarding.passwordPlaceholder}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <div className={styles.strength} aria-hidden="true">
-            {[1, 2, 3, 4, 5].map((step) => (
-              <span
-                key={step}
-                className={`${styles.strengthBar} ${strength.score >= step ? styles.strengthOn : ''}`}
-              />
-            ))}
+      {mode === 'choose' ? (
+        <div className={styles.card}>
+          {heading}
+          <div className={styles.choices}>
+            <button
+              type="button"
+              className={`${styles.choice} ${styles.choicePrimary}`}
+              onClick={() => setMode('create')}
+            >
+              <span className={styles.choiceIcon}>
+                <Plus size={14} aria-hidden="true" />
+              </span>
+              <span className={styles.choiceText}>
+                <span className={styles.choiceTitle}>{copy.onboarding.createOption}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.choice}
+              onClick={() => {
+                useUiStore.getState().setPendingPackage(null)
+                openDialog('migrationImport')
+              }}
+            >
+              <span className={styles.choiceIcon}>
+                <PackageOpen size={14} aria-hidden="true" />
+              </span>
+              <span className={styles.choiceText}>
+                <span className={styles.choiceTitle}>{copy.onboarding.importOption}</span>
+              </span>
+            </button>
+            <button type="button" className={styles.choice} onClick={() => setRestoreOpen(true)}>
+              <span className={styles.choiceIcon}>
+                <GitBranch size={14} aria-hidden="true" />
+              </span>
+              <span className={styles.choiceText}>
+                <span className={styles.choiceTitle}>{copy.onboarding.gitOption}</span>
+              </span>
+            </button>
           </div>
-          <div className={styles.strengthLabel}>{strength.label}</div>
         </div>
+      ) : (
+        <form className={styles.card} onSubmit={submit}>
+          {heading}
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="confirm-password">
-            {copy.onboarding.confirmLabel}
-          </label>
-          <PasswordInput
-            id="confirm-password"
-            className={styles.passwordInput}
-            autoComplete="new-password"
-            value={confirm}
-            placeholder={copy.onboarding.confirmPlaceholder}
-            onChange={(event) => setConfirm(event.target.value)}
-          />
-        </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="new-password">
+              {copy.onboarding.passwordLabel}
+            </label>
+            <PasswordInput
+              id="new-password"
+              className={styles.passwordInput}
+              autoFocus
+              autoComplete="new-password"
+              value={password}
+              placeholder={copy.onboarding.passwordPlaceholder}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <div className={styles.strength} aria-hidden="true">
+              {[1, 2, 3, 4, 5].map((step) => (
+                <span
+                  key={step}
+                  className={`${styles.strengthBar} ${strength.score >= step ? styles.strengthOn : ''}`}
+                />
+              ))}
+            </div>
+            <div className={styles.strengthLabel}>{strength.label}</div>
+          </div>
 
-        <button className={styles.submit} type="submit" disabled={busy}>
-          {busy ? copy.common.loading : copy.onboarding.submit}
-        </button>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="confirm-password">
+              {copy.onboarding.confirmLabel}
+            </label>
+            <PasswordInput
+              id="confirm-password"
+              className={styles.passwordInput}
+              autoComplete="new-password"
+              value={confirm}
+              placeholder={copy.onboarding.confirmPlaceholder}
+              onChange={(event) => setConfirm(event.target.value)}
+            />
+          </div>
 
-        <div className={styles.error} role="alert">
-          {error}
-        </div>
-
-        <p className={styles.warning}>{copy.onboarding.warning}</p>
-
-        <div className={styles.footer}>
-          <span>{copy.onboarding.importing}</span>
-          <button
-            type="button"
-            className={styles.linkBtn}
-            onClick={() => {
-              useUiStore.getState().setPendingPackage(null)
-              openDialog('migrationImport')
-            }}
-          >
-            <PackageOpen size={12} aria-hidden="true" /> {copy.onboarding.importAction}
+          <button className={styles.submit} type="submit" disabled={busy}>
+            {busy ? copy.common.loading : copy.onboarding.submit}
           </button>
-        </div>
-      </form>
+
+          <div className={styles.error} role="alert">
+            {error}
+          </div>
+
+          <p className={styles.warning}>{copy.onboarding.warning}</p>
+
+          <div className={styles.backRow}>
+            <button type="button" className={styles.linkBtn} onClick={() => setMode('choose')}>
+              ← {copy.onboarding.back}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <KeyRestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} />
     </div>
   )
 }

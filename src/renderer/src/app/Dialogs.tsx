@@ -1,6 +1,7 @@
 import { ExportDialog, ImportDialog } from '@/features/import-export/ExternalDialogs'
 import { MigrationExportDialog } from '@/features/migration/MigrationExportDialog'
 import { MigrationImportDialog } from '@/features/migration/MigrationImportDialog'
+import { KeyBackupDialog } from '@/features/preferences/KeyBackupDialog'
 import { ChangePasswordDialog } from '@/features/preferences/AccountDialogs'
 import { useUiStore } from '@/stores/ui'
 
@@ -11,6 +12,7 @@ export function Dialogs(): React.JSX.Element {
   return (
     <>
       <ChangePasswordDialog open={dialog === 'changePassword'} onClose={close} />
+      <KeyBackupDialog open={dialog === 'keyBackup'} onClose={close} />
       <MigrationExportDialog open={dialog === 'migrationExport'} onClose={close} />
       <MigrationImportDialog open={dialog === 'migrationImport'} onClose={close} />
       <ImportDialog open={dialog === 'import'} onClose={close} />

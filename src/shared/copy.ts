@@ -22,13 +22,17 @@ export const copy = {
   onboarding: {
     title: '创建你的加密日记库',
     subtitle: '所有内容都保存在这台电脑上，用密码加密。没有账号，不上传，也没有找回密码。',
+    chooseTitle: '开始使用 Mini Diary',
+    chooseSubtitle: '选择一种方式开始。',
+    createOption: '创建新的日记库',
+    importOption: '导入迁移包',
+    gitOption: '从 Git 同步',
+    back: '返回选择',
     passwordLabel: '设置密码',
     passwordPlaceholder: '至少 8 位',
     confirmLabel: '再输一次',
     confirmPlaceholder: '两次输入要一致',
     submit: '创建日记库',
-    importing: '已有迁移包？',
-    importAction: '导入迁移包',
     createSuccess: '日记库已创建',
     warning: '请务必牢记密码。忘记密码后，已加密的日记内容将永久无法恢复。',
     passwordTooShort: '密码至少 8 位',
@@ -337,14 +341,42 @@ export const copy = {
     tooShort: '新密码至少 8 位'
   },
 
+  keyBackup: {
+    exportTitle: '备份恢复密钥',
+    exportSubtitle:
+      '导出一个 .inkkey 文件。它只保存回来解密 Git 仓库所需的钥匙，不包含正文、批注或附件、git token、git 代理。',
+    exportPassword: '备份密码',
+    exportPasswordPlaceholder: '至少 8 位',
+    exportConfirm: '确认备份密码',
+    exportSubmit: '导出 .inkkey',
+    passwordTooShort: '备份密码至少 8 位',
+    passwordMismatch: '两次输入的密码不一致',
+    exportSuccess: '恢复密钥已导出',
+    restoreTitle: '从 Git 同步',
+    restoreSubtitle:
+      '选择一个 .inkkey，输入备份密码。恢复后会沿用这个备份密码作为日记密码，再从 Git 拉取正文和批注。',
+    restoreFile: '恢复密钥文件',
+    restoreChoose: '选择 .inkkey…',
+    restorePassword: '备份密码',
+    restoreSubmit: '恢复并创建空日记库',
+    restoreWarning: '恢复后还需要配置 Git 仓库并拉取；附件要用 .inkatt 或 .minidiary 单独恢复。',
+    restoreSuccess: '已恢复日记库，请配置 Git 并拉取',
+    settingsTitle: '备份恢复密钥',
+    syncHint: '没有它，清空或换电脑后这个仓库就无法继续同步；请先导出并保存。'
+  },
+
   migration: {
     exportTitle: '导出整个库',
     exportSubtitle:
       '把全部条目、标签、附件与偏好打包成一个加密文件。换电脑时用「导入迁移包」打开它。',
     exportPasswordLabel: '私钥（自定义密码）',
+    exportPasswordConfirm: '再次输入私钥',
     exportPasswordPlaceholder: '至少 8 位，可与日记密码不同',
     exportPasswordHint:
       '导入时需要「公钥 + 这个密码」同时正确。请务必牢记：忘记后这个包将永久无法打开，我们也没有办法帮你找回。',
+    exportPasswordMismatch: '两次输入的私钥不一致',
+    exportSyncIncluded:
+      '会包含 Git 同步设置：仓库地址、分支和开启状态；不包含 token 和代理地址。',
     exportNext: '生成公钥',
     exportStart: '开始导出',
     keyTitle: '公钥已生成',
@@ -428,11 +460,10 @@ export const copy = {
     gitTab: 'Git 同步',
     dataTab: '数据',
     intro: [
-      '同步默认是关闭的，需要手动打开。',
-      '打开后只把日记正文和批注上传到 GitHub。',
-      '照片、视频和文件不会上传；换设备时用「数据 → 仅迁移附件」导入或导出。',
-      '今天写的正文和批注会先留在本机，等第二天再点「推送」才会一起同步。',
-      'GitHub 上只有加密后的文件，别人看不到内容。',
+      '没有「备份恢复密钥」，清空或换电脑后 Git 同步就会失效；请先导出并保存。',
+      '受限于git仓库大小，仅同步加密后的日记正文和批注。',
+      '附件内容不会同步到git，请手动同步。',
+      '默认不同步 [今日] 的数据',
       '每次推送都会留下一个版本。'
     ],
     syncSwitch: 'Git 同步',
@@ -485,13 +516,9 @@ export const copy = {
     dataDir: '日记文件目录',
     dataDirHint: '正文、批注、附件的密文都在这里',
     openDir: '打开',
-    syncFolder: '同步文件夹',
-    syncFolderHint: 'Git 镜像、提交历史和合并状态都在这里；需要高级操作时可自行在终端打开',
-    openSyncFolder: '打开文件夹',
     changeDir: '更改…',
     migration: '一键迁移',
     migrationHint: '整库打包成单个 .minidiary（正文 + 批注 + 附件），包内全部是密文',
-    migrationImport: '导入…',
     migrationExport: '导出…',
     attachmentPackage: '仅迁移附件',
     attachmentPackageHint:

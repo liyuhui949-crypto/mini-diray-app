@@ -399,3 +399,20 @@
     transform: none;
   }
 }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--md-font-mono);
+  font-size: 11px;
+  color: var(--md-text-secondary);
+}
