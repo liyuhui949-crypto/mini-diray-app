@@ -10,6 +10,7 @@ import type { MigrationSummary } from '@shared/types'
 
 import { call, errorMessage } from '@/api/client'
 import { Button, Dialog, Field, PasswordInput, Progress, uiStyles } from '@/components/ui'
+import { usePrefsStore } from '@/stores/prefs'
 import { useUiStore } from '@/stores/ui'
 import { useVaultStore } from '@/stores/vault'
 
@@ -28,6 +29,7 @@ export function MigrationExportDialog({
   onClose: () => void
 }): React.JSX.Element {
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [packageKey, setPackageKey] = useState('')
   const [copied, setCopied] = useState(false)
   const [countdown, setCountdown] = useState(THINK_SECONDS)
@@ -36,11 +38,13 @@ export function MigrationExportDialog({
   const [result, setResult] = useState<{ path: string; summary: MigrationSummary } | null>(null)
   const busy = useVaultStore((state) => state.busy)
   const pushToast = useUiStore((state) => state.pushToast)
+  const syncEnabled = usePrefsStore((state) => state.prefs?.syncEnabled === true)
   const copiedTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (!open) {
       setPassword('')
+      setConfirm('')
       setPackageKey('')
       setCopied(false)
       setCountdown(THINK_SECONDS)
@@ -76,6 +80,10 @@ export function MigrationExportDialog({
   const goToKey = (): void => {
     if (password.length < PASSWORD_MIN_LENGTH) {
       setError('私钥至少 8 位')
+      return
+    }
+    if (password !== confirm) {
+      setError(copy.migration.exportPasswordMismatch)
       return
     }
     setError(null)
@@ -157,7 +165,11 @@ export function MigrationExportDialog({
         ) : (
           <>
             <Button onClick={onClose}>{copy.common.cancel}</Button>
-            <Button variant="primary" disabled={password.length === 0} onClick={goToKey}>
+            <Button
+              variant="primary"
+              disabled={password.length === 0 || confirm.length === 0}
+              onClick={goToKey}
+            >
               {copy.migration.exportNext}
             </Button>
           </>
@@ -182,7 +194,19 @@ export function MigrationExportDialog({
               }}
             />
           </Field>
-
+          <Field label={copy.migration.exportPasswordConfirm} htmlFor="export-password-confirm">
+            <PasswordInput
+              id="export-password-confirm"
+              autoComplete="new-password"
+              placeholder={copy.migration.exportPasswordPlaceholder}
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && password.length > 0 && confirm.length > 0) goToKey()
+              }}
+            />
+          </Field>
+          {syncEnabled ? <p className={uiStyles.info}>{copy.migration.exportSyncIncluded}</p> : null}
         </>
       ) : null}
 

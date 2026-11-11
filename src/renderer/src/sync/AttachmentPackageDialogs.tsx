@@ -35,6 +35,7 @@ export function AttachmentExportDialog({
 }): React.JSX.Element {
   const [phase, setPhase] = useState<'form' | 'key' | 'running' | 'done'>('form')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [packageKey, setPackageKey] = useState('')
   const [copied, setCopied] = useState(false)
   const [countdown, setCountdown] = useState(THINK_SECONDS)
@@ -46,6 +47,7 @@ export function AttachmentExportDialog({
     if (open) return
     setPhase('form')
     setPassword('')
+    setConfirm('')
     setPackageKey('')
     setCopied(false)
     setCountdown(THINK_SECONDS)
@@ -78,6 +80,10 @@ export function AttachmentExportDialog({
   const goToKey = (): void => {
     if (password.length < 8) {
       setError('私钥至少 8 位')
+      return
+    }
+    if (password !== confirm) {
+      setError(copy.migration.exportPasswordMismatch)
       return
     }
     setError(null)
@@ -153,7 +159,11 @@ export function AttachmentExportDialog({
         ) : (
           <>
             <Button onClick={onClose}>{copy.common.cancel}</Button>
-            <Button variant="primary" disabled={password.length === 0} onClick={goToKey}>
+            <Button
+              variant="primary"
+              disabled={password.length === 0 || confirm.length === 0}
+              onClick={goToKey}
+            >
               {copy.migration.exportNext}
             </Button>
           </>
@@ -161,6 +171,7 @@ export function AttachmentExportDialog({
       }
     >
       {phase === 'form' ? (
+        <>
         <Field
           label={copy.migration.exportPasswordLabel}
           hint={copy.migration.exportPasswordHint}
@@ -177,6 +188,19 @@ export function AttachmentExportDialog({
             }}
           />
         </Field>
+        <Field label={copy.migration.exportPasswordConfirm} htmlFor="att-export-password-confirm">
+          <PasswordInput
+            id="att-export-password-confirm"
+            autoComplete="new-password"
+            placeholder={copy.migration.exportPasswordPlaceholder}
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && password.length > 0 && confirm.length > 0) goToKey()
+            }}
+          />
+        </Field>
+        </>
       ) : null}
 
       {phase === 'key' || phase === 'done' ? (
