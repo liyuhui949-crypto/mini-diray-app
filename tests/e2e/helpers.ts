@@ -57,6 +57,9 @@ export async function fillInput(locator: Locator, value: string): Promise<void> 
 
 /** 用密码创建日记库，并等三栏界面出现 */
 export async function createVault(page: Page, password: string): Promise<void> {
+  if ((await page.locator('#new-password').count()) === 0) {
+    await page.getByRole('button', { name: '创建新的日记库' }).click()
+  }
   await fillInput(page.locator('#new-password'), password)
   await fillInput(page.locator('#confirm-password'), password)
   await page.getByRole('button', { name: '创建日记库' }).click()

@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises'
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
 
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 
@@ -28,7 +28,7 @@ test('同步面板、两页签与缺失附件状态', async () => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
 
-  await expect(page.locator('#new-password')).toBeVisible()
+  await expect(page.getByRole('button', { name: '创建新的日记库' })).toBeVisible()
   await createVault(page, PASSWORD)
 
   // 历史条目：引用一个不存在的附件（模拟“文本已同步、附件未迁移”）
@@ -68,20 +68,23 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByRole('tab', { name: '数据' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('tab', { name: 'Git 同步' })).toBeVisible()
   await page.getByRole('tab', { name: 'Git 同步' }).click()
-  await expect(page.getByText('同步默认是关闭的，需要手动打开。')).toBeVisible()
+  await expect(page.getByText(/没有「备份恢复密钥」/)).toBeVisible()
   await expect(page.getByText('每次推送都会留下一个版本。')).toBeVisible()
   const syncSwitch = page.getByRole('switch')
   await expect(syncSwitch).toHaveAttribute('aria-checked', 'false')
   await expect(page.getByText('同步已关闭').first()).toBeVisible()
   await expect(page.getByText('Git 密钥')).toHaveCount(0)
-  await expect(page.getByText('同步文件夹')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '打开文件夹' })).toHaveCount(0)
+  await expect(page.getByText('备份恢复密钥', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导出 .inkkey' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '测试连接' })).toHaveCount(0)
 
   await syncSwitch.click()
   await expect(syncSwitch).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByText('尚未连接仓库').first()).toBeVisible()
   await expect(page.getByText('Git 密钥')).toBeVisible()
+  await expect(page.getByText('备份恢复密钥', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '导出 .inkkey' })).toBeVisible()
+  await expect(page.getByText(/清空或换电脑后/).first()).toBeVisible()
   await syncSwitch.click()
   await expect(syncSwitch).toHaveAttribute('aria-checked', 'false')
   await expect(page.getByText('Git 密钥')).toHaveCount(0)
@@ -90,11 +93,16 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByText('1 个附件未迁移')).toBeVisible()
   await expect(page.getByText('仅迁移附件')).toBeVisible()
 
-  await page.getByRole('button', { name: '导出…' }).nth(1).click()
-  await expect(page.locator('#att-export-password')).toBeVisible()
+  await page.getByRole('button', { name: '导出…' }).first().click()
+  await expect(page.getByText(/会包含 Git 同步设置/)).toHaveCount(0)
   await page.keyboard.press('Escape')
 
-  await page.getByRole('button', { name: '导入…' }).nth(1).click()
+  await page.getByRole('button', { name: '导出…' }).nth(1).click()
+  await expect(page.locator('#att-export-password')).toBeVisible()
+  await expect(page.locator('#att-export-password-confirm')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: '导入…' }).click()
   await expect(page.locator('#att-import-key')).toBeVisible()
   await page.keyboard.press('Escape')
 
@@ -110,14 +118,21 @@ test('同步面板、两页签与缺失附件状态', async () => {
   await expect(page.getByRole('button', { name: '打开文稿设置' })).toBeVisible()
   await expect(page.getByRole('button', { name: '打开本地网络设置' })).toBeVisible()
 
-  // 清空全部数据：应删除日记库、密码和配置，回到首次安装的引导页
+  // 清空全部数据：应删除日记库、密码、配置和旧同步镜像，回到首次安装的引导页
+  const syncDir = `${homeDir}/diary/.sync`
+  await mkdir(syncDir, { recursive: true })
+  await writeFile(
+    `${syncDir}/sync.json`,
+    JSON.stringify({ format: 1, vaultId: 'old-vault-id' })
+  )
   await page.getByRole('button', { name: '同步', exact: true }).click()
   await page.getByRole('tab', { name: '数据' }).click()
   await page.getByRole('button', { name: '清空…' }).click()
   await page.locator('#reset-password').fill(PASSWORD)
   await page.locator('#reset-delete').fill('我确定清空全部数据')
   await page.getByRole('button', { name: '我确定清空全部数据' }).click()
-  await expect(page.locator('#new-password')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: '创建新的日记库' })).toBeVisible({ timeout: 20_000 })
+  await expect(stat(syncDir)).rejects.toBeTruthy()
 
   const bootstrap = await page.evaluate(() => window.miniDiary.invoke('app:bootstrap', undefined))
   if (!bootstrap.ok) throw new Error('bootstrap failed')
@@ -129,7 +144,7 @@ test('同步面板、两页签与缺失附件状态', async () => {
   const relaunched = await launchApp(homeDir)
   app = relaunched.app
   page = relaunched.page
-  await expect(page.locator('#new-password')).toBeVisible()
+  await expect(page.getByRole('button', { name: '创建新的日记库' })).toBeVisible()
   await expect(page.locator('#unlock-password')).toHaveCount(0)
 
   expect(errors).toEqual([])

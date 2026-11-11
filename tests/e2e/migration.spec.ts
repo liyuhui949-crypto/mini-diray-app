@@ -56,6 +56,15 @@ test('导出迁移包再导入到全新安装', async () => {
     await page.keyboard.type('下午四点雨停了。')
     await expect(page.getByText(/已保存/)).toBeVisible({ timeout: 15_000 })
 
+    // 导出时带上 Git 同步设置（不含 token/代理）
+    await page.evaluate(() =>
+      window.miniDiary.invoke('prefs:update', {
+        syncEnabled: true,
+        syncRepo: 'https://github.com/example/diary.git',
+        syncBranch: 'dev'
+      })
+    )
+
     // 导出迁移包（保存对话框替换成固定路径）
     await appA.evaluate(({ dialog }, target) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: target })
@@ -64,7 +73,9 @@ test('导出迁移包再导入到全新安装', async () => {
     await page.getByRole('button', { name: '同步', exact: true }).click()
     await page.getByRole('tab', { name: '数据' }).click()
     await page.getByRole('button', { name: '导出…' }).first().click()
+    await expect(page.getByText(/会包含 Git 同步设置/)).toBeVisible()
     await fillInput(page.locator('#export-password'), PACKAGE_PASSWORD)
+    await fillInput(page.locator('#export-password-confirm'), PACKAGE_PASSWORD)
     await page.getByRole('button', { name: '生成公钥' }).click()
     await expect(page.locator('#package-key')).toBeVisible()
     packageKey = (await page.locator('#package-key').textContent())?.trim() ?? ''
@@ -87,7 +98,7 @@ test('导出迁移包再导入到全新安装', async () => {
     appB = launched.app
     const page = launched.page
 
-    await expect(page.locator('#new-password')).toBeVisible()
+    await expect(page.getByRole('button', { name: /导入迁移包/ })).toBeVisible()
     await page.getByRole('button', { name: /导入迁移包/ }).click()
 
     await appB.evaluate(({ dialog }, target) => {
@@ -107,8 +118,13 @@ test('导出迁移包再导入到全新安装', async () => {
     await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible({ timeout: 60_000 })
     await page.getByRole('button', { name: '完成' }).click()
 
-    // 导入后的库用新密码解锁，内容回来了
+    // 导入后的库用新密码解锁，内容回来了；同步设置也恢复，但仍需重新填 token
     await expect(page.getByText('雨停之后').first()).toBeVisible({ timeout: 30_000 })
+    const restoredPrefs = await page.evaluate(() => window.miniDiary.invoke('prefs:read', undefined))
+    if (!restoredPrefs.ok) throw new Error('prefs failed')
+    expect(restoredPrefs.data.syncEnabled).toBe(true)
+    expect(restoredPrefs.data.syncRepo).toBe('https://github.com/example/diary.git')
+    expect(restoredPrefs.data.syncBranch).toBe('dev')
     await page.getByRole('button', { name: '锁定' }).click()
     await expect(page.locator('#unlock-password')).toBeVisible()
     await unlockVault(page, PACKAGE_PASSWORD)
