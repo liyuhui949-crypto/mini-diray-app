@@ -43,3 +43,7 @@ Mini Diary 是一个面向个人长期记录的桌面日记应用。它把「写
 目前提供 macOS Apple Silicon 版本，使用 `.dmg` 安装。
 
 [下载 Mini Diary](https://github.com/liyuhui949-crypto/mini-diray-app/releases/latest) · [安装说明与签名限制](/download)
+
+## 社区
+
+Mini Diary 在 [LINUX DO](https://linux.do) 社区分享，欢迎在那里交流使用体验和反馈。

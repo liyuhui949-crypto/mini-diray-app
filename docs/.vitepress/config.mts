@@ -14,6 +14,7 @@ export default defineConfig({
       { text: '使用说明', link: '/usage' },
       { text: '隐私与安全', link: '/privacy' },
       { text: '下载', link: '/download' },
+      { text: 'LINUX DO', link: 'https://linux.do' },
       { text: '实现说明', link: '/encryption' }
     ],
     sidebar: [
