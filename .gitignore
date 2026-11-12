@@ -17,9 +17,8 @@ tmp-shots/
 .vite/
 .cache/
 tmp/
-docs/_site/
-docs/.jekyll-cache/
-.jekyll-metadata
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 .sass-cache/
 vendor/bundle/
 *.pid

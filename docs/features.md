@@ -1,7 +1,5 @@
 ---
-layout: default
 title: 功能
-permalink: /features/
 ---
 
 # 功能
@@ -59,4 +57,4 @@ permalink: /features/
 - 仓库里只有密文；GitHub 上看不到日记内容。
 - 令牌用日记库密钥加密保存，不写入仓库。
 
-[隐私与安全]({{ '/privacy/' | relative_url }})
+[隐私与安全](/privacy)

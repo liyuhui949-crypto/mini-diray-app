@@ -32,7 +32,10 @@
     "package:mac:x64": "pnpm build && node scripts/package-dir.mjs --mac --arch=x64",
     "package:mac:universal": "pnpm build && node scripts/package-dir.mjs --mac --arch=universal",
     "package:win": "pnpm build && node scripts/package-dir.mjs --win",
-    "package:linux": "pnpm build && node scripts/package-dir.mjs --linux"
+    "package:linux": "pnpm build && node scripts/package-dir.mjs --linux",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.3.1",
@@ -83,6 +86,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",
+    "vitepress": "1.6.4",
     "vitest": "^5.1.0",
     "zod": "^4.6.7",
     "zustand": "^5.0.16"

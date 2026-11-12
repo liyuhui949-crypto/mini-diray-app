@@ -1,7 +1,5 @@
 ---
-layout: default
 title: 使用说明
-permalink: /usage/
 ---
 
 # 使用说明

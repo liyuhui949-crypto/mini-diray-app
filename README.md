@@ -40,6 +40,9 @@ pnpm test:unit      # Vitest 单元测试
 pnpm test:component # Vitest + RTL 组件测试
 pnpm test:e2e       # Playwright + 真实 Electron（先 build）
 pnpm verify         # typecheck + lint + unit + component + build
+pnpm docs:dev       # 本地预览文档站
+pnpm docs:build     # 构建文档站到 docs/.vitepress/dist
+pnpm docs:preview   # 预览文档站构建结果
 ```
 
 打包（需要 Electron 二进制，公司网络可设 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`）：
@@ -66,12 +69,13 @@ src/
 └─ shared/               类型、Zod、纯函数、中文文案、Markdown 渲染
 tests/
 ├─ unit/ component/ e2e/ fixtures/
-docs/                           GitHub Pages 公开介绍
+docs/                           VitePress 项目介绍站，GitHub Pages 公开介绍
 ├─ index.md                    首页
 ├─ features.md                 功能介绍
 ├─ privacy.md                  隐私与安全
 ├─ usage.md                    使用说明
-└─ _config.yml                 Pages 配置
+└─ .vitepress/
+   └─ config.mts               导航、主题与站点配置
 ```
 
 ## 安全基线
@@ -93,4 +97,4 @@ docs/                           GitHub Pages 公开介绍
 - macOS App Store 分发不在范围内。
 
 项目介绍见 [GitHub Pages 文档](docs/index.md)；使用说明见 [使用说明](docs/usage.md)；
-隐私与安全见 [隐私与安全](docs/privacy.md)。
+隐私与安全见 [隐私与安全](docs/privacy.md)。文档站使用 VitePress，由 `.github/workflows/deploy-docs.yml` 在推送 main 时自动部署。

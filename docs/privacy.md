@@ -1,7 +1,5 @@
 ---
-layout: default
 title: 隐私与安全
-permalink: /privacy/
 ---
 
 # 隐私与安全
