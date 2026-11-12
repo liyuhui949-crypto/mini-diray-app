@@ -1,0 +1,11 @@
+title: Mini Diary
+description: 本地优先、端到端加密的桌面日记
+theme: minima
+lang: zh-CN
+markdown: kramdown
+show_excerpts: false
+
+header_pages:
+  - features.md
+  - usage.md
+  - privacy.md

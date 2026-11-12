@@ -5,6 +5,7 @@ node_modules/
 # build output
 out/
 dist/
+dist-electron/
 release/
 coverage/
 *.tsbuildinfo
@@ -12,15 +13,55 @@ playwright-report/
 test-results/
 tmp-shots/
 
-# logs & os
+# local caches
+.vite/
+.cache/
+tmp/
+docs/_site/
+docs/.jekyll-cache/
+.jekyll-metadata
+.sass-cache/
+vendor/bundle/
+*.pid
+*.seed
+*.tgz
+
+# logs & OS
 *.log
 logs/
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-# 演示数据（体积大，本地生成；见 demo/README.md）
-demo/*.minidiary
-demo/*.key.txt
+# local editor/OS files
+.idea/
+*.swp
+*~
 
 # local env
 .env
-.env.local
+.env.*
+!.env.example
+
+# Mini Diary local data / generated packages
+*.minidiary
+*.inkkey
+*.mdat
+*.vault
+*.part
+.sync/
+*.key.txt
+
+# signing / packaging secrets and artifacts
+*.pem
+*.p12
+*.mobileprovision
+*.dmg
+*.pkg
+*.AppImage
+*.app/
+*.blockmap
+latest*.yml

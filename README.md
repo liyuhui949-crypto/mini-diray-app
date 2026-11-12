@@ -66,14 +66,12 @@ src/
 └─ shared/               类型、Zod、纯函数、中文文案、Markdown 渲染
 tests/
 ├─ unit/ component/ e2e/ fixtures/
-docs/
-├─ implementation-pipeline-v2.md   执行入口与阶段状态
-├─ adr/                            架构决策记录
-├─ known-issues.md                 代码审计：已知 bug 与清理清单（待统一修复）
-├─ storage-format.md               存储格式与加密细节（vault/批注/附件/迁移包）
-├─ sync.md                         Git 同步（系统 git、仅正文/批注、附件包）
-├─ usage.md                        使用说明（含迁移与隐私）
-└─ packaging.md                    打包与分发（macOS，不上架 App Store）
+docs/                           GitHub Pages 公开介绍
+├─ index.md                    首页
+├─ features.md                 功能介绍
+├─ privacy.md                  隐私与安全
+├─ usage.md                    使用说明
+└─ _config.yml                 Pages 配置
 ```
 
 ## 安全基线
@@ -94,6 +92,5 @@ docs/
 - 当前仓库只有 macOS arm64 的打包验证记录；Windows/Linux 与签名/公证需要在有证书的环境完成。
 - macOS App Store 分发不在范围内。
 
-更多实现细节见 [执行流水线](docs/implementation-pipeline-v2.md) 与 [ADR](docs/adr/0001-rewrite.md)；
-存储与加密细节见 [存储格式与加密](docs/storage-format.md)；Git 同步见 [Git 同步](docs/sync.md)；
-已知待修问题见 [已知问题清单](docs/known-issues.md)；打包步骤见 [打包与分发](docs/packaging.md)。
+项目介绍见 [GitHub Pages 文档](docs/index.md)；使用说明见 [使用说明](docs/usage.md)；
+隐私与安全见 [隐私与安全](docs/privacy.md)。
