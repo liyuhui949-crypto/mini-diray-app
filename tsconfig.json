@@ -1,3 +1,21 @@
 {
-  "files": []
+  "extends": "./tsconfig.web.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/renderer/src/**/*.ts",
+    "src/renderer/src/**/*.tsx",
+    "tests/unit/**/*.ts",
+    "tests/component/**/*.ts",
+    "tests/component/**/*.tsx",
+    "tests/setup/**/*.ts",
+    "tests/e2e/**/*.ts",
+    "electron.vite.config.ts",
+    "vitest.config.mts",
+    "playwright.config.ts"
+  ]
 }
