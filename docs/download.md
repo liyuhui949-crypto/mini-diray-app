@@ -8,7 +8,7 @@ title: 下载
 
 [下载 Mini Diary 1.0.0（.dmg）](https://github.com/liyuhui949-crypto/mini-diray-app/releases/latest)
 
-- 文件：`Mini Diary-1.0.0-arm64.dmg`
+- 文件：`Mini.Diary-1.0.0-arm64.dmg`
 - 大小：约 117 MB
 - 适用：Apple Silicon Mac（M1/M2/M3/M4 等）
 - 暂不提供 Intel Mac、Windows、Linux 安装包
