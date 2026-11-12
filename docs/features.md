@@ -58,3 +58,10 @@ title: 功能
 - 令牌用日记库密钥加密保存，不写入仓库。
 
 [隐私与安全](/privacy)
+
+## 深入了解
+
+- [加密功能](/encryption)
+- [一键迁移](/migration)
+- [Git 同步](/git-sync)
+- [检索功能](/search)

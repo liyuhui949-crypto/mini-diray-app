@@ -12,7 +12,8 @@ export default defineConfig({
     nav: [
       { text: '功能', link: '/features' },
       { text: '使用说明', link: '/usage' },
-      { text: '隐私与安全', link: '/privacy' }
+      { text: '隐私与安全', link: '/privacy' },
+      { text: '实现说明', link: '/encryption' }
     ],
     sidebar: [
       {
@@ -27,6 +28,15 @@ export default defineConfig({
         items: [
           { text: '使用说明', link: '/usage' },
           { text: '隐私与安全', link: '/privacy' }
+        ]
+      },
+      {
+        text: '深入说明',
+        items: [
+          { text: '加密功能', link: '/encryption' },
+          { text: '一键迁移', link: '/migration' },
+          { text: 'Git 同步', link: '/git-sync' },
+          { text: '检索功能', link: '/search' }
         ]
       }
     ],
