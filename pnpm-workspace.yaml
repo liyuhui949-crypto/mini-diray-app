@@ -9,4 +9,6 @@ onlyBuiltDependencies:
 verifyDepsBeforeRun: false
 minimumReleaseAge: 0
 allowBuilds:
-  electron-winstaller: set this to true or false
+  electron-winstaller: false
+  esbuild: true
+  '@parcel/watcher': false
