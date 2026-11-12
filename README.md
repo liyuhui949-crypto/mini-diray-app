@@ -1,11 +1,19 @@
-# Mini Diary 4.0
+# Mini Diary
 
 本地优先、默认加密、离线可用的桌面日记。默认纯本地存储，没有账号；可选 Git 同步只推送正文与批注的密文，附件仍走手动迁移。
 
 - **技术栈**：Electron + React 19 + Vite + TypeScript + SCSS
 - **界面语言**：仅简体中文（文案集中在 `src/shared/copy.ts`，不引入 i18n）
-- **平台**：macOS / Windows / Linux
+- **平台**：macOS / Windows / Linux 源码；当前 Release 仅 macOS arm64
 - **当前版本**：1.0.0
+
+## 下载
+
+当前提供 macOS Apple Silicon 版本：
+
+[下载 Mini Diary 1.0.0](https://github.com/liyuhui949-crypto/mini-diray-app/releases/latest) · [安装说明](https://liyuhui949-crypto.github.io/mini-diray-app/download.html)
+
+安装包未使用 Apple Developer ID 签名，也未经过 Apple 公证；首次打开可能被 Gatekeeper 拦截，处理方式见安装说明。
 
 ## 功能
 
@@ -20,8 +28,8 @@
 | 搜索 | 检索洞察：命中篇数 + 最早/最近范围、逐月时间线柱状、按年份分组的证据（连续段徽标）、预览对话框不打断检索；320ms 防抖 + 回车立即检索；中文子串、NFKC 归一化、多词 AND |
 | 统计 | 总条目、每周平均、最长/当前连续、总字数、每篇平均 + 近 12 周柱状图 + 13 周热力图 + 存储占用 |
 | 安全 | 密码解锁、锁屏/挂起立即锁定、可选空闲自动锁定、改密只重包 DEK |
-| 迁移 | `.minidiary` 整库迁移包（公钥 + 私钥双因子、ZIP64、replace/merge、staging + 原子切换 + 回滚；携带 Git 仓库/分支/开启状态，不带 token/代理） |
-| Git 同步 | 可选、默认关闭；侧栏「同步」在右侧面板配置；开启后使用系统 `git` 只同步正文与批注，今天不同步；仓库里只有密文；附件用带公钥+私钥的 `.inkatt` 手动迁移；恢复密钥 `.inkkey` 用于清空后重新解密 Git 仓库；今日/附件缺失态在三处联动；令牌用日记库密钥加密保存 |
+| 迁移 | `.minidiary` 整库迁移包（公钥 + 私钥双因子、ZIP64、replace/merge、staging + 原子切换 + 回滚；携带 Git 仓库/分支/开启状态，不带 token/代理）；首次安装页导入，数据页只保留导出 |
+| Git 同步 | 可选、默认关闭；侧栏「同步」在右侧面板配置；开启后使用系统 `git` 只同步正文与批注，今天和附件不同步；仓库里只有密文；附件用带公钥+私钥的 `.inkatt` 手动迁移；恢复密钥 `.inkkey` 用于清空后重新解密 Git 仓库；令牌用日记库密钥加密保存 |
 | 导入导出 | Day One JSON/TXT、jrnl JSON、Mini Diary JSON；导出 JSON / Markdown / PDF / Day One TXT |
 
 ## 快速开始
@@ -50,19 +58,20 @@ pnpm docs:preview   # 预览文档站构建结果
 ```bash
 pnpm build
 node scripts/package-dir.mjs     # 未签名 .app，输出到 release/
-pnpm package:mac                 # dmg + zip（需要 Developer ID 证书才能签名/公证）
+pnpm package:mac                 # macOS arm64 dmg + zip；未签名，正式签名/公证需要 Developer ID
 ```
 
 ## 目录结构
 
 ```text
 src/
-├─ main/                 主进程：文件、加密、附件流、迁移、导入导出、菜单、更新
+├─ main/                 主进程：文件、加密、附件流、迁移、导入导出、窗口与菜单
 │  ├─ vault/             加密信封（scrypt + AES-256-GCM）、仓库、临时回滚点
 │  ├─ attachments/       MDAT v1 分块 AEAD、流式 store、Range 解密代理
 │  ├─ migration/         .minidiary 导出/导入/staging
 │  ├─ import/ export/    外部格式解析与导出（含 PDF 打印链路）
 │  ├─ core/zip.ts        yazl/yauzl 流式 ZIP64
+│  ├─ menu/              原生菜单与窗口命令
 │  └─ ipc/               类型化 IPC + Zod 校验 + sender 校验
 ├─ preload/              contextBridge 白名单（不暴露 ipcRenderer/fs）
 ├─ renderer/             React 三栏界面（日历 / 条目列表 / 编辑器）
@@ -74,6 +83,7 @@ docs/                           VitePress 项目介绍站，GitHub Pages 公开�
 ├─ features.md                 功能介绍
 ├─ privacy.md                  隐私与安全
 ├─ usage.md                    使用说明
+├─ download.md                 下载与安装说明
 └─ .vitepress/
    └─ config.mts               导航、主题与站点配置
 ```
@@ -93,11 +103,13 @@ docs/                           VitePress 项目介绍站，GitHub Pages 公开�
 - 不做自动备份：迁移包是唯一的完整副本；删除/重置前会提示先导出。
 - 视频只支持 Chromium 自带的解码能力（无 ffmpeg、无转码、无缩略图/波形）。
 - 密码无法找回，迁移包密码也一样。
-- 当前仓库只有 macOS arm64 的打包验证记录；Windows/Linux 与签名/公证需要在有证书的环境完成。
-- macOS App Store 分发不在范围内。
+- 当前 Release 只有 macOS arm64；没有 Intel、Windows、Linux 正式安装包。
+- 未使用 Apple Developer ID，未公证，也不在 App Store 上架；首次打开可能被 Gatekeeper 拦截，且没有自动更新。
+- 正式签名、公证和自动更新需要在有 Apple 开发者账号的环境完成。
 
 项目介绍见 [GitHub Pages 文档](docs/index.md)；使用说明见 [使用说明](docs/usage.md)；
-隐私与安全见 [隐私与安全](docs/privacy.md)。文档站使用 VitePress，由 `.github/workflows/deploy-docs.yml` 在推送 main 时自动部署。
+隐私与安全见 [隐私与安全](docs/privacy.md)；下载与安装见 [下载说明](docs/download.md)。
+文档站使用 VitePress，由 `.github/workflows/deploy-docs.yml` 在推送 main 时自动部署。
 
 ## 许可证
 
