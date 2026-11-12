@@ -13,6 +13,7 @@ export default defineConfig({
       { text: '功能', link: '/features' },
       { text: '使用说明', link: '/usage' },
       { text: '隐私与安全', link: '/privacy' },
+      { text: '下载', link: '/download' },
       { text: '实现说明', link: '/encryption' }
     ],
     sidebar: [
@@ -20,7 +21,8 @@ export default defineConfig({
         text: '开始',
         items: [
           { text: '项目介绍', link: '/' },
-          { text: '功能', link: '/features' }
+          { text: '功能', link: '/features' },
+          { text: '下载', link: '/download' }
         ]
       },
       {

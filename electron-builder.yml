@@ -23,8 +23,11 @@ extraResources:
       - noto-sans-sc-latin-700-normal.woff2
 
 asar: true
+# 无 Developer ID 的本地 ad-hoc 包跳过 ASAR integrity；避免 electron-builder 26 在自定义 electronDist 下读取 app.asar 头失败
+disableAsarIntegrity: true
 
 # 无证书时在打包后做 ad-hoc 签名，避免「已损坏，无法打开」
+afterExtract: scripts/after-extract.cjs
 afterPack: scripts/after-pack.cjs
 
 fileAssociations:

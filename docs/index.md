@@ -12,6 +12,9 @@ hero:
     - theme: alt
       text: 开始使用
       link: /usage
+    - theme: alt
+      text: 下载 macOS 版
+      link: /download
 features:
   - title: 本地优先
     details: 默认不联网，没有账号体系；日记只保存在本机。
@@ -33,4 +36,10 @@ Mini Diary 是一个面向个人长期记录的桌面日记应用。它把「写
 
 它不要求注册账号，也不会把日记上传到服务器。默认情况下，所有内容只存在你的电脑上，并由你的密码保护。
 
-[了解完整功能](/features) · [阅读使用说明](/usage) · [隐私与安全](/privacy)
+[了解完整功能](/features) · [阅读使用说明](/usage) · [隐私与安全](/privacy) · [下载 macOS 版](/download)
+
+## 下载
+
+目前提供 macOS Apple Silicon 版本，使用 `.dmg` 安装。
+
+[下载 Mini Diary](https://github.com/liyuhui949-crypto/mini-diray-app/releases/latest) · [安装说明与签名限制](/download)
