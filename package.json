@@ -8,7 +8,7 @@
     "name": "Mini Diary",
     "email": "hello@minidiary.app"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "private": true,
   "engines": {
     "node": ">=22"

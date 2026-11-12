@@ -45,7 +45,7 @@ export default defineConfig({
     ],
     footer: {
       message: '本地优先、默认加密的桌面日记',
-      copyright: 'MIT License'
+      copyright: 'AGPL-3.0 · Copyright © 2026 李玉辉'
     },
     outline: { level: [2, 3], label: '本页目录' },
     docFooter: { prev: '上一页', next: '下一页' },

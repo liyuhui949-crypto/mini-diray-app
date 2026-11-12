@@ -98,3 +98,9 @@ docs/                           VitePress 项目介绍站，GitHub Pages 公开�
 
 项目介绍见 [GitHub Pages 文档](docs/index.md)；使用说明见 [使用说明](docs/usage.md)；
 隐私与安全见 [隐私与安全](docs/privacy.md)。文档站使用 VitePress，由 `.github/workflows/deploy-docs.yml` 在推送 main 时自动部署。
+
+## 许可证
+
+本项目采用 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0-only）。
+
+Copyright (C) 2026 李玉辉。
