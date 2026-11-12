@@ -33,6 +33,8 @@ export class AppContext {
   readonly appVersion: string
 
   private idleTimer: NodeJS.Timeout | null = null
+  /** 最后一次应用内用户输入；自动锁定不再依赖整台 Mac 的空闲时间 */
+  private lastActivityAt = Date.now()
   private readonly flushWaiters = new Map<string, () => void>()
   private locking: Promise<void> | null = null
 
@@ -76,6 +78,11 @@ export class AppContext {
 
   async vaultStatus(): Promise<VaultStatus> {
     return this.repository.statusOnDisk()
+  }
+
+  /** 渲染进程收到 pointer/key/wheel 等输入时调用 */
+  touchActivity(): void {
+    this.lastActivityAt = Date.now()
   }
 
   /** 偏好里的目录变化后重建仓库实例（idle → 不丢数据，因为此时必然未解锁） */
@@ -156,8 +163,8 @@ export class AppContext {
     this.idleTimer = setInterval(() => {
       const minutes = this.preferences.current.autoLockMinutes
       if (!minutes || !this.repository.isUnlocked) return
-      const idleSeconds = powerMonitor.getSystemIdleTime()
-      if (idleSeconds >= minutes * 60) {
+      const idleMs = Date.now() - this.lastActivityAt
+      if (idleMs >= minutes * 60_000) {
         void this.lock('idle')
       }
     }, IDLE_POLL_MS)

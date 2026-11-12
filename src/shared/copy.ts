@@ -50,7 +50,7 @@ export const copy = {
     placeholder: '••••••••',
     submit: '解锁',
     lockedBySystem: '已随系统锁屏锁定',
-    lockedByIdle: '已因空闲自动锁定'
+    lockedByIdle: '已因长时间无操作自动锁定'
   },
 
   menu: {
@@ -306,7 +306,7 @@ export const copy = {
     allowFutureDesc: '关闭后，日历上的未来日期不可点击',
     security: '安全',
     autoLock: '自动锁定',
-    autoLockDesc: '空闲超过设定时间后自动锁定；系统锁屏时立即锁定',
+    autoLockDesc: '在 Mini Diary 内超过设定时间没有操作就锁定；期间使用其他应用也算空闲；系统锁屏时立即锁定',
     autoLockNever: '永不',
     autoLockMinutes: (n: number) => `${n} 分钟`,
     changePassword: '修改密码',

@@ -165,6 +165,7 @@ export function registerIpcHandlers(context: AppContext): void {
 
   register('vault:unlock', async ({ password }) => {
     const snapshot = await repository.unlock(password)
+    context.touchActivity()
     setMainWindowLocked(false)
     return snapshot
   })
@@ -349,11 +350,16 @@ export function registerIpcHandlers(context: AppContext): void {
     if (patch.diaryDir) throw new AppError('INVALID_INPUT', '目录变更请使用迁移流程')
     const previous = preferences.current
     const next = await preferences.update(patch)
+    if (patch.autoLockMinutes !== undefined) context.touchActivity()
     broadcast(EVENTS.prefsChanged, next)
     if (previous.theme !== next.theme) {
       broadcast(EVENTS.themeChanged, { theme: resolveTheme(context), source: 'preference' })
     }
     return next
+  })
+
+  register('activity:ping', async () => {
+    context.touchActivity()
   })
 
   // ───────────────────────── dialogs ─────────────────────────

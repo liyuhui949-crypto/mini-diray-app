@@ -31,6 +31,23 @@ export default function App(): React.JSX.Element {
   }, [theme])
 
   useEffect(() => {
+    if (!booted || status !== 'unlocked') return
+    let lastPing = 0
+    const ping = (): void => {
+      const now = Date.now()
+      if (now - lastPing < 10_000) return
+      lastPing = now
+      void call('activity:ping', undefined).catch(() => undefined)
+    }
+    ping()
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart']
+    for (const event of events) window.addEventListener(event, ping, { passive: true })
+    return () => {
+      for (const event of events) window.removeEventListener(event, ping)
+    }
+  }, [booted, status])
+
+  useEffect(() => {
     let cancelled = false
     void (async () => {
       try {

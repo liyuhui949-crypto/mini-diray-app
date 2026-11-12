@@ -11,7 +11,9 @@ export default tseslint.config(
       'node_modules/**',
       'playwright-report/**',
       'test-results/**',
-      'build/**'
+      'build/**',
+      'docs/.vitepress/dist/**',
+      'docs/.vitepress/cache/**'
     ]
   },
   ...tseslint.configs.recommended,

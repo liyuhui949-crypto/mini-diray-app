@@ -75,6 +75,8 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: ErrorPayl
 export interface IpcContract {
   'app:bootstrap': { req: void; res: BootstrapInfo }
   'app:flushAck': { req: { token: string }; res: void }
+  /** 渲染进程有真实用户输入时上报，用于应用内无操作自动锁定 */
+  'activity:ping': { req: void; res: void }
   'app:openDiaryDir': { req: void; res: void }
   'shell:openExternal': { req: { url: string }; res: void }
   'system:openPrivacySettings': { req: { target: 'localNetwork' | 'filesAndFolders' }; res: void }
